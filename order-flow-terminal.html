@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Flow Terminal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #040609; --panel: #080b0f; --border: rgba(44, 57, 77, 0.3);
+      --green: #22ff75; --red: #fc1644; --amber: #fd9a09; --blue: #18c0ff;
+      --text: #e3ecff; --dim: #2c394d;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Arial, sans-serif; overflow-x: hidden; font-size: 11px; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 10px; }
+    .header { text-align: center; margin-bottom: 15px; }
+    .header h1 { color: var(--green); font-size: 18px; margin-bottom: 5px; }
+    .pair-info { display: flex; justify-content: center; gap: 20px; margin-bottom: 10px; font-size: 12px; }
+    .pair-info span { color: var(--dim); }
+    .pair-info .active { color: var(--amber); background: rgba(253, 154, 9, 0.1); padding: 2px 8px; border-radius: 3px; }
+    .timeframe-selector { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+    .tf-btn { background: rgba(8, 11, 15, 0.8); border: 1px solid var(--border); color: var(--dim); padding: 4px 12px; border-radius: 3px; cursor: pointer; font-size: 10px; transition: all 0.2s; }
+    .tf-btn:hover { background: rgba(253, 154, 9, 0.15); color: var(--amber); }
+    .tf-btn.active { background: rgba(253, 154, 9, 0.2); color: var(--amber); border-color: var(--amber); }
+    
+    .alerts-section { background: linear-gradient(135deg, rgba(253, 154, 9, 0.1), rgba(253, 154, 9, 0.05)); border: 1px solid rgba(253, 154, 9, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+    .alerts-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .alerts-title { color: var(--amber); font-size: 13px; font-weight: bold; }
+    .sound-toggle { display: flex; align-items: center; gap: 8px; }
+    .sound-toggle label { color: var(--dim); font-size: 11px; cursor: pointer; }
+    .alert-count { color: var(--amber); font-size: 16px; font-weight: bold; text-align: center; margin: 8px 0; }
+    .alert-thresholds { display: flex; justify-content: center; gap: 15px; font-size: 10px; color: var(--dim); margin-bottom: 8px; }
+    .alert-status { text-align: center; font-size: 11px; color: var(--dim); }
+    .alert-list { max-height: 150px; overflow-y: auto; margin-top: 10px; }
+    .alert-item { background: rgba(8, 11, 15, 0.8); border-left: 3px solid var(--amber); padding: 8px; margin-bottom: 5px; border-radius: 4px; font-size: 11px; }
+    .alert-item.whale { border-left-color: var(--blue); }
+    .alert-item.institutional { border-left-color: var(--red); }
+    .alert-time { color: var(--dim); font-size: 9px; }
+    .alert-type { font-weight: bold; margin-top: 3px; }
+    .alert-type.whale { color: var(--blue); }
+    .alert-type.institutional { color: var(--red); }
+    .alert-details { color: var(--text); margin-top: 3px; }
+    .notification-settings { background: rgba(8, 11, 15, 0.6); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-top: 10px; }
+    .notification-title { color: var(--green); font-size: 11px; margin-bottom: 8px; }
+    .notification-options { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; }
+    .notification-option { display: flex; align-items: center; gap: 5px; }
+    .notification-option label { color: var(--dim); cursor: pointer; }
+    .notification-input { background: rgba(8, 11, 15, 0.8); border: 1px solid rgba(44, 57, 77, 0.5); color: var(--text); padding: 4px 8px; border-radius: 3px; font-size: 10px; width: 180px; margin-top: 5px; }
+    
+    .chart-wrapper { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 15px; overflow: hidden; height: 500px; }
+    .chart-container { position: relative; width: calc(100% - 100px); height: 100%; display: inline-block; vertical-align: top; }
+    #chartCanvas { width: 100%; height: 100%; }
+    .volume-profile-container { position: relative; width: 100px; height: 100%; display: inline-block; vertical-align: top; border-left: 1px solid var(--border); background: rgba(8, 11, 15, 0.5); }
+    #vpCanvas { width: 100%; height: 100%; }
+    .chart-controls { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 10; }
+    .chart-btn { background: rgba(8, 11, 15, 0.9); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: all 0.2s; }
+    .chart-btn:hover { background: rgba(253, 154, 9, 0.2); border-color: var(--amber); }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px; }
+    .stat-card { background: rgba(8, 11, 15, 0.6); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+    .stat-label { color: var(--dim); font-size: 10px; margin-bottom: 5px; }
+    .stat-value { font-size: 14px; font-weight: bold; }
+    .stat-value.positive { color: var(--green); }
+    .stat-value.negative { color: var(--red); }
+    .stat-value.neutral { color: var(--text); }
+    
+    .volume-profile-info { background: rgba(24, 192, 255, 0.1); border: 1px solid rgba(24, 192, 255, 0.3); border-radius: 6px; padding: 10px; margin-bottom: 15px; }
+    .vp-title { color: var(--blue); font-size: 11px; margin-bottom: 8px; }
+    .vp-legend { display: flex; gap: 15px; font-size: 10px; margin-bottom: 8px; }
+    .vp-legend-item { display: flex; align-items: center; gap: 5px; }
+    .vp-poc { color: var(--amber); } .vp-vah { color: var(--green); } .vp-val { color: var(--red); }
+    .vp-stats { display: flex; justify-content: space-around; font-size: 11px; color: var(--dim); }
+    
+    .market-depth { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+    .depth-panel { background: rgba(8, 11, 15, 0.6); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+    .depth-title { font-size: 11px; margin-bottom: 8px; text-align: center; }
+    .depth-title.buy { color: var(--green); } .depth-title.sell { color: var(--red); }
+    .depth-ratio { text-align: center; font-size: 12px; color: var(--text); margin-bottom: 8px; }
+    .delta-bar-container { height: 6px; background: var(--red); border-radius: 3px; overflow: hidden; }
+    .delta-bar-fill { height: 100%; background: var(--green); transition: width 0.3s; }
+    
+    .data-section { background: rgba(8, 11, 15, 0.6); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 15px; min-height: 150px; max-height: 300px; overflow-y: auto; }
+    .section-title { color: var(--blue); font-size: 11px; margin-bottom: 8px; }
+    .section-status { text-align: center; color: var(--dim); font-size: 11px; padding: 20px 0; }
+    
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(8, 11, 15, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(253, 154, 9, 0.3); border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>ORDER FLOW TERMINAL</h1>
+      <div class="pair-info">
+        <span>PAXG/USDT · GOLD</span>
+        <span class="active">BTC/USDT</span>
+      </div>
+      <div class="timeframe-selector">
+        <button class="tf-btn active" onclick="changeTimeframe('1m')">1M</button>
+        <button class="tf-btn" onclick="changeTimeframe('5m')">5M</button>
+        <button class="tf-btn" onclick="changeTimeframe('15m')">15M</button>
+        <button class="tf-btn" onclick="changeTimeframe('1h')">1H</button>
+        <button class="tf-btn" onclick="changeTimeframe('4h')">4H</button>
+      </div>
+    </div>
+    
+    <div class="alerts-section">
+      <div class="alerts-header">
+        <div class="alerts-title">⚡ WHALE & INSTITUTIONAL ALERTS</div>
+        <div class="sound-toggle">
+          <input type="checkbox" id="soundEnabled" checked>
+          <label for="soundEnabled">🔊 Alert Sound</label>
+        </div>
+      </div>
+      <div class="alert-count" id="alertCount">0</div>
+      <div class="alert-thresholds">
+        <span>WHALE ≥ $100K</span>
+        <span>INST ≥ $500K</span>
+      </div>
+      <div class="alert-status" id="alertStatus">NO ALERTS YET — MONITORING...</div>
+      <div class="alert-list" id="alertList"></div>
+      
+      <div class="notification-settings">
+        <div class="notification-title">📧 NOTIFICATION SETTINGS (Free Services)</div>
+        <div class="notification-options">
+          <div class="notification-option"><input type="checkbox" id="emailNotify"><label for="emailNotify">Email</label></div>
+          <div class="notification-option"><input type="checkbox" id="smsNotify"><label for="smsNotify">SMS</label></div>
+          <div class="notification-option"><input type="checkbox" id="whatsappNotify"><label for="whatsappNotify">WhatsApp</label></div>
+        </div>
+        <input type="email" class="notification-input" id="emailInput" placeholder="Enter email address" style="display:none;">
+        <input type="tel" class="notification-input" id="smsInput" placeholder="Enter phone number" style="display:none;">
+        <input type="text" class="notification-input" id="whatsappInput" placeholder="Enter WhatsApp number" style="display:none;">
+      </div>
+    </div>
+    
+    <div class="chart-wrapper">
+      <div class="chart-container"><canvas id="chartCanvas"></canvas></div>
+      <div class="volume-profile-container"><canvas id="vpCanvas"></canvas></div>
+      <div class="chart-controls">
+        <button class="chart-btn" onclick="resetChart()">Reset View</button>
+      </div>
+    </div>
+    
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">LAST PRICE</div><div class="stat-value neutral" id="lastPrice">---</div></div>
+      <div class="stat-card"><div class="stat-label">24H CHANGE</div><div class="stat-value neutral" id="change24h">---</div></div>
+      <div class="stat-card"><div class="stat-label">24H HIGH</div><div class="stat-value positive" id="high24h">---</div></div>
+      <div class="stat-card"><div class="stat-label">24H LOW</div><div class="stat-value negative" id="low24h">---</div></div>
+      <div class="stat-card"><div class="stat-label">CUMUL DELTA</div><div class="stat-value neutral" id="cumulDelta">0</div></div>
+      <div class="stat-card"><div class="stat-label">SESSION VOL</div><div class="stat-value neutral" id="sessionVol">0</div></div>
+    </div>
+    
+    <div class="volume-profile-info">
+      <div class="vp-title">CANDLESTICK · SESSION VOLUME PROFILE OVERLAY</div>
+      <div class="vp-legend">
+        <div class="vp-legend-item vp-poc">◆ POC</div>
+        <div class="vp-legend-item vp-vah">— VAH</div>
+        <div class="vp-legend-item vp-val">— VAL</div>
+      </div>
+      <div class="vp-stats">
+        <span id="vpBars">0 BARS</span>
+        <span id="vpLevels">0 LEVELS</span>
+      </div>
+    </div>
+    
+    <div class="market-depth">
+      <div class="depth-panel">
+        <div class="depth-title buy">BUY</div>
+        <div class="depth-ratio" id="deltaRatio">50/50</div>
+        <div class="delta-bar-container"><div class="delta-bar-fill" id="deltaBarFill" style="width: 50%"></div></div>
+      </div>
+      <div class="depth-panel"><div class="depth-title sell">SELL</div></div>
+    </div>
+    
+    <div class="data-section">
+      <div class="section-title">FOOTPRINT · 1-MIN BARS</div>
+      <div class="section-status" id="footprintBars">0 BARS</div>
+    </div>
+    
+    <div class="data-section">
+      <div class="section-title">LIVE TAPE</div>
+      <div class="section-status" id="tapeTrades">0 TRADES</div>
+    </div>
+  </div>
+
+  <script>
+    const BUCKET_SIZE = 10; // $10 price buckets
+    const WHALE_THRESHOLD = 100000;
+    const INST_THRESHOLD = 500000;
+    
+    let currentInterval = '15m';
+    let volumeProfile = {};
+    let candleBars = {};
+    let footprintBars = {};
+    let cumulDelta = 0;
+    let tradeCount = 0;
+    let alertCount = 0;
+    let sessionVol = 0;
+    let lastPrice = null;
+    let alertSoundEnabled = true;
+    let audioContext = null;
+    let tradesWs = null;
+    let tickerWs = null;
+    let klinesWs = null;
+    
+    let canvas, ctx, vpCanvas, vpCtx;
+    let chartOffset = 0;
+    let chartZoom = 1;
+    let isDragging = false;
+    let dragStart = 0;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      canvas = document.getElementById('chartCanvas');
+      ctx = canvas.getContext('2d');
+      vpCanvas = document.getElementById('vpCanvas');
+      vpCtx = vpCanvas.getContext('2d');
+      
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      
+      setupEventListeners();
+      loadHistoricalKlines();
+      connectTradesWebSocket();
+      connectTickerWebSocket();
+    });
+    
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      
+      const vpContainer = vpCanvas.parentElement;
+      vpCanvas.width = vpContainer.clientWidth;
+      vpCanvas.height = vpContainer.clientHeight;
+      
+      drawChart();
+      drawVolumeProfile();
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('soundEnabled').addEventListener('change', e => alertSoundEnabled = e.target.checked);
+      document.getElementById('emailNotify').addEventListener('change', e => document.getElementById('emailInput').style.display = e.target.checked ? 'block' : 'none');
+      document.getElementById('smsNotify').addEventListener('change', e => document.getElementById('smsInput').style.display = e.target.checked ? 'block' : 'none');
+      document.getElementById('whatsappNotify').addEventListener('change', e => document.getElementById('whatsappInput').style.display = e.target.checked ? 'block' : 'none');
+      
+      canvas.addEventListener('wheel', handleWheel);
+      canvas.addEventListener('mousedown', e => { isDragging = true; dragStart = e.clientX; });
+      canvas.addEventListener('mousemove', e => {
+        if (!isDragging) return;
+        chartOffset += e.clientX - dragStart;
+        dragStart = e.clientX;
+        drawChart();
+      });
+      canvas.addEventListener('mouseup', () => isDragging = false);
+      canvas.addEventListener('mouseleave', () => isDragging = false);
+    }
+    
+    function handleWheel(e) {
+      e.preventDefault();
+      chartZoom = Math.max(0.5, Math.min(5, chartZoom * (e.deltaY > 0 ? 0.9 : 1.1)));
+      drawChart();
+    }
+    
+    async function loadHistoricalKlines() {
+      try {
+        const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${currentInterval}&limit=200`);
+        const data = await response.json();
+        
+        candleBars = {};
+        data.forEach(k => {
+          const ts = k[0];
+          candleBars[ts] = {
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+            buyVol: parseFloat(k[9]) || parseFloat(k[5]) / 2,
+            sellVol: parseFloat(k[5]) - (parseFloat(k[9]) || parseFloat(k[5]) / 2),
+            ts: ts
+          };
+        });
+        
+        document.getElementById('vpBars').textContent = Object.keys(candleBars).length + ' BARS';
+        document.getElementById('footprintBars').textContent = Object.keys(candleBars).length + ' BARS';
+        
+        drawChart();
+        console.log('Loaded', Object.keys(candleBars).length, 'candles');
+      } catch (error) {
+        console.error('Error loading klines:', error);
+      }
+    }
+    
+    function connectTradesWebSocket() {
+      if (tradesWs) tradesWs.close();
+      
+      tradesWs = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@aggTrade');
+      
+      tradesWs.onmessage = function(event) {
+        const d = JSON.parse(event.data);
+        const price = parseFloat(d.p);
+        const qty = parseFloat(d.q);
+        const isSell = d.m;
+        const ts = d.T;
+        const usd = price * qty;
+        
+        lastPrice = price;
+        tradeCount++;
+        sessionVol += usd;
+        cumulDelta += isSell ? -qty : qty;
+        
+        // Volume profile - bucket by price
+        const bucket = (Math.round(price / BUCKET_SIZE) * BUCKET_SIZE).toFixed(2);
+        if (!volumeProfile[bucket]) volumeProfile[bucket] = { buy: 0, sell: 0 };
+        volumeProfile[bucket][isSell ? 'sell' : 'buy'] += qty;
+        
+        // Footprint - 1-min bars
+        const fpTs = Math.floor(ts / 60000) * 60000;
+        if (!footprintBars[fpTs]) {
+          footprintBars[fpTs] = { buy: 0, sell: 0, open: price, high: price, low: price, close: price, ts: fpTs };
+        }
+        const fb = footprintBars[fpTs];
+        fb.close = price;
+        fb.high = Math.max(fb.high, price);
+        fb.low = Math.min(fb.low, price);
+        fb[isSell ? 'sell' : 'buy'] += qty;
+        
+        // Update UI
+        document.getElementById('lastPrice').textContent = '$' + price.toFixed(2);
+        document.getElementById('cumulDelta').textContent = cumulDelta.toFixed(2);
+        document.getElementById('cumulDelta').className = 'stat-value ' + (cumulDelta >= 0 ? 'positive' : 'negative');
+        document.getElementById('sessionVol').textContent = sessionVol.toLocaleString(undefined, {maximumFractionDigits: 0});
+        document.getElementById('tapeTrades').textContent = tradeCount + ' TRADES';
+        document.getElementById('footprintBars').textContent = Object.keys(footprintBars).length + ' BARS';
+        document.getElementById('vpLevels').textContent = Object.keys(volumeProfile).length + ' LEVELS';
+        
+        // Update buy/sell ratio
+        const keys = Object.keys(volumeProfile);
+        const totalBuy = keys.reduce((sum, k) => sum + volumeProfile[k].buy, 0);
+        const totalSell = keys.reduce((sum, k) => sum + volumeProfile[k].sell, 0);
+        const buyPct = totalBuy / (totalBuy + totalSell) * 100;
+        document.getElementById('deltaRatio').textContent = buyPct.toFixed(0) + '/' + (100 - buyPct).toFixed(0);
+        document.getElementById('deltaBarFill').style.width = buyPct + '%';
+        
+        // Check for whale/institutional
+        if (usd >= WHALE_THRESHOLD && usd < INST_THRESHOLD) {
+          addAlert('whale', 'BTC/USDT', usd, price, isSell ? 'SELL' : 'BUY');
+        } else if (usd >= INST_THRESHOLD) {
+          addAlert('institutional', 'BTC/USDT', usd, price, isSell ? 'SELL' : 'BUY');
+        }
+        
+        // Redraw
+        drawChart();
+        drawVolumeProfile();
+      };
+      
+      tradesWs.onclose = () => setTimeout(connectTradesWebSocket, 3000);
+    }
+    
+    function connectTickerWebSocket() {
+      if (tickerWs) tickerWs.close();
+      
+      tickerWs = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+      
+      tickerWs.onmessage = function(event) {
+        const d = JSON.parse(event.data);
+        document.getElementById('high24h').textContent = '$' + parseFloat(d.h).toFixed(2);
+        document.getElementById('low24h').textContent = '$' + parseFloat(d.l).toFixed(2);
+        
+        const change = parseFloat(d.P);
+        const changeEl = document.getElementById('change24h');
+        changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+        changeEl.className = 'stat-value ' + (change >= 0 ? 'positive' : 'negative');
+      };
+      
+      tickerWs.onclose = () => setTimeout(connectTickerWebSocket, 3000);
+    }
+    
+    function drawChart() {
+      if (!ctx || Object.keys(candleBars).length === 0) return;
+      
+      const width = canvas.width;
+      const height = canvas.height;
+      const padding = { top: 20, right: 80, bottom: 30, left: 60 };
+      const VP_W = 72; // Volume profile width on right
+      
+      ctx.clearRect(0, 0, width, height);
+      
+      // Background
+      ctx.fillStyle = '#040609';
+      ctx.fillRect(0, 0, width, height);
+      
+      const bars = Object.values(candleBars).sort((a, b) => a.ts - b.ts);
+      const visibleCount = Math.floor(100 / chartZoom);
+      const startIndex = Math.max(0, bars.length - visibleCount - Math.floor(chartOffset / 10));
+      const visibleData = bars.slice(startIndex, startIndex + visibleCount);
+      
+      if (visibleData.length === 0) return;
+      
+      const minPrice = Math.min(...visibleData.map(d => d.low));
+      const maxPrice = Math.max(...visibleData.map(d => d.high));
+      const priceRange = maxPrice - minPrice || 1;
+      const pad = priceRange * 0.06;
+      const adjMin = minPrice - pad;
+      const adjMax = maxPrice + pad;
+      const adjRange = adjMax - adjMin;
+      
+      const chartL = padding.left;
+      const chartR = width - padding.right - VP_W;
+      const chartT = padding.top;
+      const chartB = height - padding.bottom;
+      const chartW = chartR - chartL;
+      const chartH = chartB - chartT;
+      
+      const pxPP = chartH / adjRange;
+      const toY = p => chartB - (p - adjMin) * pxPP;
+      
+      // Grid
+      ctx.strokeStyle = 'rgba(44, 57, 77, 0.2)';
+      ctx.lineWidth = 0.4;
+      for (let i = 0; i <= 5; i++) {
+        const y = chartT + chartH * i / 5;
+        ctx.beginPath();
+        ctx.moveTo(chartL, y);
+        ctx.lineTo(chartR + VP_W, y);
+        ctx.stroke();
+        
+        const price = adjMax - (adjRange * i / 5);
+        ctx.fillStyle = '#2c394d';
+        ctx.font = '9px Helvetica Neue';
+        ctx.textAlign = 'right';
+        ctx.fillText('$' + price.toFixed(0), width - 3, y + 3);
+      }
+      
+      // Time labels
+      const tStep = Math.max(1, Math.floor(visibleData.length / 8));
+      for (let i = 0; i < visibleData.length; i += tStep) {
+        const x = chartL + (i + 0.5) * chartW / visibleData.length;
+        ctx.strokeStyle = 'rgba(44, 57, 77, 0.2)';
+        ctx.lineWidth = 0.3;
+        ctx.beginPath();
+        ctx.moveTo(x, chartT);
+        ctx.lineTo(x, chartB);
+        ctx.stroke();
+        
+        const t = new Date(visibleData[i].ts);
+        const ts = t.getUTCHours().toString().padStart(2,'0') + ':' + t.getUTCMinutes().toString().padStart(2,'0');
+        ctx.fillStyle = '#2c394d';
+        ctx.font = '8px Helvetica Neue';
+        ctx.textAlign = 'center';
+        ctx.fillText(ts, x, chartB + 12);
+      }
+      
+      // ── SESSION VOLUME PROFILE OVERLAY (right side) ──
+      const vpX = chartR + 2;
+      const vpAreaW = VP_W - 4;
+      
+      // Light background for VP area
+      ctx.fillStyle = 'rgba(8, 11, 15, 0.6)';
+      ctx.fillRect(chartR, chartT, VP_W, chartH);
+      ctx.strokeStyle = 'rgba(44, 57, 77, 0.3)';
+      ctx.lineWidth = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(chartR, chartT);
+      ctx.lineTo(chartR, chartB);
+      ctx.stroke();
+      
+      // Calculate VP stats
+      const vpKeys = Object.keys(volumeProfile);
+      let vpMaxVol = 0, pocPrice = null, vahPrice = null, valPrice = null;
+      
+      if (vpKeys.length > 0) {
+        let maxVol = 0;
+        vpKeys.forEach(k => {
+          const vol = volumeProfile[k].buy + volumeProfile[k].sell;
+          if (vol > maxVol) { maxVol = vol; pocPrice = parseFloat(k); }
+        });
+        vpMaxVol = maxVol;
+        
+        const totalVol = vpKeys.reduce((sum, k) => sum + volumeProfile[k].buy + volumeProfile[k].sell, 0);
+        const targetVol = totalVol * 0.7;
+        
+        // Sort by volume descending to find VA
+        const sortedByVol = [...vpKeys].sort((a, b) => {
+          return (volumeProfile[b].buy + volumeProfile[b].sell) - (volumeProfile[a].buy + volumeProfile[a].sell);
+        });
+        
+        let cumVol = 0;
+        const vaPrices = [];
+        for (const k of sortedByVol) {
+          cumVol += volumeProfile[k].buy + volumeProfile[k].sell;
+          vaPrices.push(parseFloat(k));
+          if (cumVol >= targetVol) break;
+        }
+        
+        if (vaPrices.length > 0) {
+          vaPrices.sort((a, b) => a - b);
+          valPrice = vaPrices[0];
+          vahPrice = vaPrices[vaPrices.length - 1];
+        }
+        
+        // Draw horizontal volume bars
+        vpKeys.forEach(kStr => {
+          const kP = parseFloat(kStr);
+          if (kP < adjMin || kP > adjMax) return;
+          
+          const bkt = volumeProfile[kStr];
+          const tot = bkt.buy + bkt.sell;
+          if (!tot) return;
+          
+          const y = toY(kP);
+          const barH = Math.max(1.5, pxPP * BUCKET_SIZE * 0.9);
+          const buyW = vpMaxVol > 0 ? (bkt.buy / vpMaxVol) * vpAreaW : 0;
+          const sellW = vpMaxVol > 0 ? (bkt.sell / vpMaxVol) * vpAreaW : 0;
+          
+          // Buy bar (green)
+          ctx.fillStyle = 'rgba(34, 255, 117, 0.18)';
+          ctx.fillRect(vpX, y - barH/2, buyW, barH);
+          
+          // Sell bar (red) stacked
+          ctx.fillStyle = 'rgba(252, 22, 68, 0.18)';
+          ctx.fillRect(vpX + buyW, y - barH/2, sellW, barH);
+          
+          // High node highlight
+          if (tot / vpMaxVol > 0.55) {
+            ctx.fillStyle = 'rgba(34, 255, 117, 0.1)';
+            ctx.fillRect(vpX, y - barH/2, buyW + sellW, barH);
+          }
+        });
+      }
+      
+      // POC dashed line
+      if (pocPrice !== null && pocPrice >= adjMin && pocPrice <= adjMax) {
+        const pocY = toY(pocPrice);
+        ctx.strokeStyle = '#fd9a09';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(chartL, pocY);
+        ctx.lineTo(chartR + VP_W - 2, pocY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = '#fd9a09';
+        ctx.font = 'Bold 8px Helvetica Neue';
+        ctx.textAlign = 'left';
+        ctx.fillText('◆POC', vpX + 1, pocY - 2);
+      }
+      
+      // VAH
+      if (vahPrice !== null && vahPrice >= adjMin && vahPrice <= adjMax) {
+        const vahY = toY(vahPrice);
+        ctx.strokeStyle = 'rgba(34, 255, 117, 0.6)';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath();
+        ctx.moveTo(chartL, vahY);
+        ctx.lineTo(chartR - 2, vahY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = '#22ff75';
+        ctx.font = '8px Helvetica Neue';
+        ctx.textAlign = 'right';
+        ctx.fillText('VAH', chartR - 3, vahY - 2);
+      }
+      
+      // VAL
+      if (valPrice !== null && valPrice >= adjMin && valPrice <= adjMax) {
+        const valY = toY(valPrice);
+        ctx.strokeStyle = 'rgba(252, 22, 68, 0.6)';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath();
+        ctx.moveTo(chartL, valY);
+        ctx.lineTo(chartR - 2, valY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = '#fc1644';
+        ctx.font = '8px Helvetica Neue';
+        ctx.textAlign = 'right';
+        ctx.fillText('VAL', chartR - 3, valY + 10);
+      }
+      
+      // ── CANDLES ──
+      const candleWidth = Math.max(3, Math.floor(chartW / visibleData.length) - 1);
+      
+      visibleData.forEach((candle, i) => {
+        const x = chartL + i * (candleWidth + 1);
+        const openY = toY(candle.open);
+        const closeY = toY(candle.close);
+        const highY = toY(candle.high);
+        const lowY = toY(candle.low);
+        
+        const isGreen = candle.close >= candle.open;
+        const bodyTop = Math.min(openY, closeY);
+        const bodyBot = Math.max(openY, closeY);
+        const bodyH = Math.max(1, bodyBot - bodyTop);
+        const cx = x + candleWidth / 2;
+        
+        // Wick
+        ctx.strokeStyle = isGreen ? '#22ff75' : '#fc1644';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx, highY);
+        ctx.lineTo(cx, bodyTop);
+        ctx.moveTo(cx, bodyBot);
+        ctx.lineTo(cx, lowY);
+        ctx.stroke();
+        
+        // Body fill
+        ctx.fillStyle = isGreen ? '#003320' : '#330011';
+        ctx.fillRect(x, bodyTop, candleWidth, bodyH);
+        
+        // Body border
+        ctx.strokeStyle = isGreen ? '#22ff75' : '#fc1644';
+        ctx.lineWidth = 0.7;
+        ctx.strokeRect(x, bodyTop, candleWidth, bodyH);
+        
+        // Delta volume gradient overlay
+        const tot = candle.buyVol + candle.sellVol;
+        if (tot > 0) {
+          const br = candle.buyVol / tot;
+          ctx.fillStyle = isGreen ? `rgba(34, 255, 117, ${Math.min(0.4, br * 0.5)})` : `rgba(252, 22, 68, ${Math.min(0.4, (1-br) * 0.5)})`;
+          ctx.fillRect(x, bodyTop, candleWidth, bodyH);
+        }
+      });
+      
+      // Current price line
+      if (lastPrice && lastPrice >= adjMin && lastPrice <= adjMax) {
+        const py = toY(lastPrice);
+        ctx.strokeStyle = 'rgba(34, 255, 117, 0.5)';
+        ctx.lineWidth = 0.7;
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath();
+        ctx.moveTo(chartL, py);
+        ctx.lineTo(chartR, py);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Price pill
+        ctx.fillStyle = '#22ff75';
+        ctx.fillRect(chartR + 2, py - 8, VP_W - 2, 16);
+        ctx.fillStyle = '#040609';
+        ctx.font = 'Bold 8px Helvetica Neue';
+        ctx.textAlign = 'center';
+        ctx.fillText('$' + lastPrice.toFixed(2), chartR + 2 + VP_W/2, py + 3);
+      }
+    }
+    
+    function drawVolumeProfile() {
+      if (!vpCtx) return;
+      
+      const width = vpCanvas.width;
+      const height = vpCanvas.height;
+      vpCtx.clearRect(0, 0, width, height);
+      
+      // Show "AWAITING DATA" if no volume profile yet
+      if (Object.keys(volumeProfile).length === 0) {
+        vpCtx.fillStyle = '#2c394d';
+        vpCtx.font = '10px Helvetica Neue';
+        vpCtx.textAlign = 'center';
+        vpCtx.fillText('AWAITING DATA', width/2, height/2);
+        return;
+      }
+      
+      const prices = Object.keys(volumeProfile).map(Number).sort((a, b) => b - a);
+      if (prices.length === 0) return;
+      
+      let maxVol = 0;
+      prices.forEach(p => {
+        const vol = volumeProfile[p].buy + volumeProfile[p].sell;
+        if (vol > maxVol) maxVol = vol;
+      });
+      
+      // Find POC
+      let poc = prices[0], pocVol = 0;
+      prices.forEach(p => {
+        const vol = volumeProfile[p].buy + volumeProfile[p].sell;
+        if (vol > pocVol) { pocVol = vol; poc = p; }
+      });
+      
+      // Find VAH/VAL
+      const totalVol = prices.reduce((sum, p) => sum + volumeProfile[p].buy + volumeProfile[p].sell, 0);
+      const targetVol = totalVol * 0.7;
+      
+      const sortedByVol = [...prices].sort((a, b) => {
+        return (volumeProfile[b].buy + volumeProfile[b].sell) - (volumeProfile[a].buy + volumeProfile[a].sell);
+      });
+      
+      let cumVol = 0;
+      const vaPrices = [];
+      for (const p of sortedByVol) {
+        cumVol += volumeProfile[p].buy + volumeProfile[p].sell;
+        vaPrices.push(p);
+        if (cumVol >= targetVol) break;
+      }
+      
+      let vah = poc, val = poc;
+      if (vaPrices.length > 0) {
+        vaPrices.sort((a, b) => a - b);
+        val = vaPrices[0];
+        vah = vaPrices[vaPrices.length - 1];
+      }
+      
+      const barHeight = Math.max(2, height / prices.length - 1);
+      const maxBarWidth = width - 50;
+      
+      prices.forEach((price, i) => {
+        const y = i * (height / prices.length);
+        const buyVol = volumeProfile[price].buy;
+        const sellVol = volumeProfile[price].sell;
+        
+        const buyWidth = (buyVol / maxVol) * maxBarWidth;
+        const sellWidth = (sellVol / maxVol) * maxBarWidth;
+        
+        const isPOC = price === poc;
+        const isVA = price >= val && price <= vah;
+        
+        // Buy bar (left side)
+        vpCtx.fillStyle = isPOC ? '#fd9a09' : (isVA ? 'rgba(34, 255, 117, 0.6)' : 'rgba(34, 255, 117, 0.3)');
+        vpCtx.fillRect(width - 50 - buyWidth, y, buyWidth, barHeight);
+        
+        // Sell bar (right side)
+        vpCtx.fillStyle = isPOC ? '#fd9a09' : (isVA ? 'rgba(252, 22, 68, 0.6)' : 'rgba(252, 22, 68, 0.3)');
+        vpCtx.fillRect(width - 50, y, sellWidth, barHeight);
+        
+        // Price label
+        if (i % Math.ceil(prices.length / 15) === 0 || isPOC) {
+          vpCtx.fillStyle = isPOC ? '#fd9a09' : '#2c394d';
+          vpCtx.font = isPOC ? 'bold 10px Helvetica Neue' : '9px Helvetica Neue';
+          vpCtx.textAlign = 'left';
+          vpCtx.fillText('$' + price.toFixed(0), 2, y + barHeight - 2);
+        }
+      });
+    }
+    
+    function resetChart() {
+      chartOffset = 0;
+      chartZoom = 1;
+      drawChart();
+    }
+    
+    function changeTimeframe(tf) {
+      currentInterval = tf;
+      document.querySelectorAll('.tf-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase() === tf) btn.classList.add('active');
+      });
+      chartOffset = 0;
+      chartZoom = 1;
+      loadHistoricalKlines();
+    }
+    
+    function playAlertSound(type) {
+      if (!alertSoundEnabled) return;
+      try {
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        osc.frequency.value = type === 'whale' ? 800 : 600;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        osc.start(audioContext.currentTime);
+        osc.stop(audioContext.currentTime + 0.5);
+      } catch (e) { console.error('Sound error:', e); }
+    }
+    
+    function sendNotification(alert) {
+      const message = `🚨 ${alert.type.toUpperCase()} ${alert.side} ALERT\nPair: ${alert.pair}\nAmount: $${alert.amount.toLocaleString()}\nPrice: $${alert.price.toFixed(2)}\nTime: ${alert.time}`;
+      
+      if (document.getElementById('emailNotify').checked) {
+        const email = document.getElementById('emailInput').value;
+        if (email) fetch('https://formsubmit.co/ajax/' + email, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject: 'Whale/Institutional Alert', message })
+        }).catch(err => console.error('Email failed:', err));
+      }
+      
+      if (document.getElementById('smsNotify').checked) {
+        const phone = document.getElementById('smsInput').value;
+        if (phone) fetch('https://textbelt.com/text', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, message, key: 'textbelt' })
+        }).catch(err => console.error('SMS failed:', err));
+      }
+      
+      if (document.getElementById('whatsappNotify').checked) {
+        const whatsapp = document.getElementById('whatsappInput').value;
+        if (whatsapp) fetch(`https://api.callmebot.com/whatsapp.php?phone=${whatsapp}&text=${encodeURIComponent(message)}&apikey=YOUR_API_KEY`)
+          .catch(err => console.error('WhatsApp failed:', err));
+      }
+    }
+    
+    function addAlert(type, pair, amount, price, side = 'UNKNOWN') {
+      alertCount++;
+      document.getElementById('alertCount').textContent = alertCount;
+      document.getElementById('alertStatus').textContent = `${alertCount} ALERT(S) DETECTED`;
+      
+      const alertList = document.getElementById('alertList');
+      const alertItem = document.createElement('div');
+      alertItem.className = `alert-item ${type}`;
+      
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString();
+      const sideColor = side === 'BUY' ? '#22ff75' : '#fc1644';
+      
+      alertItem.innerHTML = `
+        <div class="alert-time">${timeStr}</div>
+        <div class="alert-type ${type}">${type.toUpperCase()} ${side} DETECTED</div>
+        <div class="alert-details">
+          ${pair} · $${amount.toLocaleString(undefined, {maximumFractionDigits: 0})} @ $${price.toFixed(2)}
+          <span style="color: ${sideColor}; font-weight: bold; margin-left: 8px;">[${side}]</span>
+        </div>
+      `;
+      
+      alertList.insertBefore(alertItem, alertList.firstChild);
+      while (alertList.children.length > 20) alertList.removeChild(alertList.lastChild);
+      
+      playAlertSound(type);
+      sendNotification({ type, pair, amount, price, side, time: timeStr });
+    }
+  </script>
+</body>
+</html>

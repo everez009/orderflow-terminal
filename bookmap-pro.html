@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOOKMAP PRO - Order Flow Heatmap</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #0f1623;
+  --bg-tertiary: #141c2b;
+  --border: #1e2d45;
+  
+  --color-buy: #00d4aa;
+  --color-buy-dim: rgba(0, 212, 170, 0.15);
+  --color-sell: #ff4757;
+  --color-sell-dim: rgba(255, 71, 87, 0.15);
+  
+  --color-accent: #ffa502;
+  --color-info: #1e90ff;
+  --color-text: #e8edf5;
+  --color-text-dim: #6b7a90;
+  
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', sans-serif;
+  
+  --fs-base: 13px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 212, 170, 0.006) 2px,
+    rgba(0, 212, 170, 0.006) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.logo {
+  font-family: var(--font-sans);
+  font-size: 1.1em;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: var(--color-buy);
+  text-shadow: 0 0 20px rgba(0, 212, 170, 0.4);
+}
+
+.header-right {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.status-label {
+  color: var(--color-text-dim);
+  font-size: 0.8em;
+  letter-spacing: 2px;
+}
+
+.clock {
+  font-family: var(--font-sans);
+  font-size: 0.9em;
+  color: var(--color-accent);
+  letter-spacing: 2px;
+}
+
+/* Controls Bar */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.symbol-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.tab {
+  padding: 8px 18px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--color-text-dim);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+.tab.active {
+  color: var(--color-buy);
+  border-bottom-color: var(--color-buy);
+}
+
+.tab:hover:not(.active) {
+  color: var(--color-text);
+}
+
+.control-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.icon-btn {
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.8em;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  color: var(--color-text-dim);
+  transition: all 0.15s;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.icon-btn.active {
+  color: var(--color-buy);
+  border-color: var(--color-buy);
+  background: var(--color-buy-dim);
+}
+
+.icon-btn.accent {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: rgba(255, 165, 2, 0.1);
+}
+
+.icon-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-dim);
+}
+
+/* Price Info Bar */
+.price-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.price-cell {
+  background: var(--bg-secondary);
+  padding: 6px 12px;
+}
+
+.price-label {
+  color: var(--color-text-dim);
+  font-size: 0.7em;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.price-value {
+  font-family: var(--font-sans);
+  font-size: 1.1em;
+  font-weight: 700;
+}
+
+.price-value.up { color: var(--color-buy); }
+.price-value.down { color: var(--color-sell); }
+.price-value.neutral { color: var(--color-text); }
+
+/* Alert Bar - Plain English */
+.alert-bar {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.alert-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.alert-title {
+  font-family: var(--font-sans);
+  font-size: 0.7em;
+  letter-spacing: 3px;
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.alert-count {
+  background: rgba(255, 165, 2, 0.2);
+  color: var(--color-accent);
+  border: 1px solid rgba(255, 165, 2, 0.3);
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 0.7em;
+  font-weight: 700;
+}
+
+.alert-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  padding: 5px 10px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  scroll-behavior: smooth;
+}
+
+.alert-scroll::-webkit-scrollbar { height: 3px; }
+.alert-scroll::-webkit-scrollbar-thumb { background: var(--color-text-dim); border-radius: 2px; }
+
+.alert-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border-left: 3px solid;
+  flex-shrink: 0;
+  min-width: 200px;
+  max-width: 350px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.alert-chip.absorption {
+  background: rgba(255, 165, 2, 0.1);
+  border-left-color: var(--color-accent);
+}
+
+.alert-chip.spoofing {
+  background: rgba(255, 71, 87, 0.1);
+  border-left-color: var(--color-sell);
+}
+
+.alert-chip.wall {
+  background: rgba(30, 144, 255, 0.1);
+  border-left-color: var(--color-info);
+}
+
+.alert-chip.pressure {
+  background: rgba(0, 212, 170, 0.1);
+  border-left-color: var(--color-buy);
+}
+
+.alert-chip.divergence {
+  background: rgba(138, 43, 226, 0.1);
+  border-left-color: #8a2be2;
+}
+
+.alert-chip.rejection {
+  background: rgba(255, 105, 180, 0.1);
+  border-left-color: #ff69b4;
+}
+
+.chip-icon {
+  font-size: 1.1em;
+  margin-right: 4px;
+}
+
+.chip-message {
+  font-size: 0.75em;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.chip-detail {
+  font-size: 0.65em;
+  color: var(--color-text-dim);
+}
+
+.no-alerts {
+  color: var(--color-text-dim);
+  font-size: 0.8em;
+  letter-spacing: 2px;
+  padding: 0 14px;
+}
+
+/* Main Layout */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1px;
+  background: var(--border);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Heatmap Panel */
+.heatmap-panel {
+  background: var(--bg-primary);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.heatmap-header {
+  padding: 5px 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
+  font-size: 0.7em;
+  letter-spacing: 2px;
+  color: var(--color-info);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+#heatmapCanvas {
+  flex: 1;
+  min-height: 0;
+  display: block;
+  cursor: crosshair;
+}
+
+/* Side Panel */
+.side-panel {
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-section {
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-header {
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  font-family: var(--font-sans);
+  font-size: 0.7em;
+  letter-spacing: 2px;
+  color: var(--color-info);
+  font-weight: 700;
+}
+
+.panel-body {
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.panel-body::-webkit-scrollbar { width: 3px; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--color-text-dim); border-radius: 2px; }
+
+/* Volume Profile */
+.vp-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  font-size: 0.75em;
+}
+
+.vp-price {
+  width: 70px;
+  text-align: right;
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+.vp-bars {
+  flex: 1;
+  display: flex;
+  gap: 1px;
+  height: 10px;
+}
+
+.vp-buy {
+  background: var(--color-buy);
+  border-radius: 1px 0 0 1px;
+}
+
+.vp-sell {
+  background: var(--color-sell);
+  border-radius: 0 1px 1px 0;
+}
+
+.vp-poc {
+  background: rgba(255, 165, 2, 0.2);
+  border-left: 2px solid var(--color-accent);
+}
+
+/* Key Levels */
+.level-item {
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  border-radius: 3px;
+  border-left: 3px solid;
+  font-size: 0.75em;
+}
+
+.level-item.support {
+  background: var(--color-buy-dim);
+  border-left-color: var(--color-buy);
+}
+
+.level-item.resistance {
+  background: var(--color-sell-dim);
+  border-left-color: var(--color-sell);
+}
+
+.level-type {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.level-price {
+  color: var(--color-text-dim);
+  font-size: 0.9em;
+}
+
+.level-strength {
+  color: var(--color-accent);
+  font-size: 0.85em;
+  margin-top: 2px;
+}
+
+/* Loading */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 14, 23, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 30;
+}
+
+.loading-text {
+  font-family: var(--font-sans);
+  font-size: 0.9em;
+  color: var(--color-buy);
+  letter-spacing: 3px;
+}
+
+.loading-bar {
+  width: 200px;
+  height: 2px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-progress {
+  height: 100%;
+  background: var(--color-buy);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">📊 BOOKMAP PRO</div>
+  <div class="header-right">
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="status-dot" id="statusDot" style="background:var(--color-accent);box-shadow:0 0 8px var(--color-accent)"></div>
+      <span class="status-label" id="statusLabel">CONNECTING...</span>
+    </div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="symbol-tabs">
+    <button class="tab active" onclick="switchSymbol('BTCUSDT')" id="tab-BTCUSDT">BTC/USDT</button>
+    <button class="tab" onclick="switchSymbol('PAXGUSDT')" id="tab-PAXGUSDT">PAXG/USDT (Gold)</button>
+  </div>
+  <div class="control-group">
+    <button class="icon-btn accent" id="viewBtn" onclick="toggleView()">🌡 HEATMAP</button>
+    <button class="icon-btn" onclick="toggleSound()">🔊 OFF</button>
+  </div>
+</div>
+
+<!-- Price Bar -->
+<div class="price-bar">
+  <div class="price-cell">
+    <div class="price-label">LAST PRICE</div>
+    <div class="price-value neutral" id="lastPrice">---</div>
+  </div>
+  <div class="price-cell">
+    <div class="price-label">24H CHANGE</div>
+    <div class="price-value neutral" id="priceChange">---</div>
+  </div>
+  <div class="price-cell">
+    <div class="price-label">24H HIGH</div>
+    <div class="price-value up" id="highPrice">---</div>
+  </div>
+  <div class="price-cell">
+    <div class="price-label">24H LOW</div>
+    <div class="price-value down" id="lowPrice">---</div>
+  </div>
+  <div class="price-cell">
+    <div class="price-label">ORDER BOOK DEPTH</div>
+    <div class="price-value neutral" id="depthInfo">---</div>
+  </div>
+</div>
+
+<!-- Alert Bar - Plain English -->
+<div class="alert-bar">
+  <div class="alert-header">
+    <span class="alert-title">🔍 LIVE PATTERNS DETECTED</span>
+    <span class="alert-count" id="alertCount">0</span>
+  </div>
+  <div class="alert-scroll" id="alertScroll">
+    <span class="no-alerts">MONITORING ORDER FLOW — NO PATTERNS YET</span>
+  </div>
+</div>
+
+<!-- Main Layout -->
+<div class="main-layout">
+  <!-- Heatmap Panel -->
+  <div class="heatmap-panel">
+    <div class="heatmap-header">
+      <span id="heatmapTitle">🌡 ORDER BOOK HEATMAP — LIVE LIMIT ORDERS</span>
+      <div style="display:flex;gap:8px;font-size:0.65em;color:var(--color-text-dim)">
+        <span style="color:var(--color-buy)">■ Buyers Waiting</span>
+        <span style="color:var(--color-sell)">■ Sellers Waiting</span>
+        <span style="color:var(--color-accent)">⚡ Heavy Wall</span>
+        <span style="color:#00ff88">● Buy Trade</span>
+        <span style="color:#ff4757">● Sell Trade</span>
+      </div>
+    </div>
+    <canvas id="heatmapCanvas"></canvas>
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-text">LOADING ORDER BOOK DATA...</div>
+      <div class="loading-bar"><div class="loading-progress" id="loadingProgress" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- Side Panel -->
+  <div class="side-panel">
+    <!-- Volume Profile -->
+    <div class="panel-section">
+      <div class="panel-header">📊 VOLUME PROFILE (Session)</div>
+      <div class="panel-body" id="volumeProfile">
+        <div style="text-align:center;color:var(--color-text-dim);font-size:0.75em;padding:20px 0;">
+          Waiting for trades...
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Levels -->
+    <div class="panel-section">
+      <div class="panel-header">🎯 KEY LEVELS</div>
+      <div class="panel-body" id="keyLevels">
+        <div style="text-align:center;color:var(--color-text-dim);font-size:0.75em;padding:20px 0;">
+          Analyzing order book...
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="panel-section" style="flex:1;border-bottom:none;">
+      <div class="panel-header">⚡ RECENT ACTIVITY</div>
+      <div class="panel-body" id="recentActivity" style="max-height:none;">
+        <div style="text-align:center;color:var(--color-text-dim);font-size:0.75em;padding:20px 0;">
+          No recent activity
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════
+const SYMBOLS = {
+  BTCUSDT: { label: 'BTC/USDT', whaleUSD: 500000, instUSD: 150000, dec: 1 },
+  PAXGUSDT: { label: 'PAXG/USDT', whaleUSD: 50000, instUSD: 25000, dec: 2 }
+};
+
+let activeSymbol = 'BTCUSDT';
+let soundOn = false;
+let viewMode = 'heatmap'; // 'heatmap' or 'chart'
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const state = {
+  orderBook: { bids: {}, asks: {} },
+  trades: [],
+  volumeProfile: {},
+  alerts: [],
+  lastPrice: null,
+  high24h: null,
+  low24h: null,
+  change24h: null,
+  ws: null,
+  depthWs: null,
+  heatmapHistory: [], // Time-series of order book snapshots
+  spoofingTracker: {},
+  absorptionTracker: {},
+  tradeHistory: [] // For drawing bubbles
+};
+
+// ═══════════════════════════════════════════
+// WEBSOCKET CONNECTIONS
+// ═══════════════════════════════════════════
+function connect() {
+  if (state.ws) state.ws.close();
+  
+  const streams = `${activeSymbol.toLowerCase()}@aggTrade/${activeSymbol.toLowerCase()}@ticker`;
+  state.ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+  
+  state.ws.onopen = () => {
+    document.getElementById('statusDot').style.background = 'var(--color-buy)';
+    document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--color-buy)';
+    document.getElementById('statusLabel').textContent = 'LIVE';
+  };
+  
+  state.ws.onmessage = (e) => {
+    const { stream, data } = JSON.parse(e.data);
+    if (stream.includes('aggTrade')) handleTrade(data);
+    else if (stream.includes('ticker')) handleTicker(data);
+  };
+  
+  state.ws.onerror = () => {
+    document.getElementById('statusDot').style.background = 'var(--color-sell)';
+    document.getElementById('statusLabel').textContent = 'ERROR';
+  };
+  
+  state.ws.onclose = () => {
+    document.getElementById('statusDot').style.background = 'var(--color-accent)';
+    document.getElementById('statusLabel').textContent = 'RECONNECTING';
+    setTimeout(connect, 3000);
+  };
+}
+
+function connectDepth() {
+  if (state.depthWs && state.depthWs.readyState === WebSocket.OPEN) return;
+  
+  state.depthWs = new WebSocket(`wss://stream.binance.com:9443/ws/${activeSymbol.toLowerCase()}@depth20@100ms`);
+  
+  state.depthWs.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    updateOrderBook(data);
+  };
+  
+  state.depthWs.onerror = () => {};
+  state.depthWs.onclose = () => {
+    setTimeout(() => { if (viewMode === 'heatmap') connectDepth(); }, 3000);
+  };
+}
+
+// ═══════════════════════════════════════════
+// TRADE HANDLER
+// ═══════════════════════════════════════════
+function handleTrade(d) {
+  const cfg = SYMBOLS[activeSymbol];
+  const price = parseFloat(d.p);
+  const qty = parseFloat(d.q);
+  const usd = price * qty;
+  const isSell = d.m;
+  
+  state.lastPrice = price;
+  
+  // Store trade for bubble visualization
+  state.tradeHistory.push({
+    price,
+    qty,
+    usd,
+    isSell,
+    time: Date.now()
+  });
+  
+  // Keep only recent trades for display (last 2 minutes)
+  const twoMinAgo = Date.now() - 120000;
+  state.tradeHistory = state.tradeHistory.filter(t => t.time > twoMinAgo);
+  
+  // Update volume profile
+  const bucket = getBucketSize(price);
+  const priceLevel = (Math.round(price / bucket) * bucket).toFixed(cfg.dec);
+  if (!state.volumeProfile[priceLevel]) {
+    state.volumeProfile[priceLevel] = { buy: 0, sell: 0 };
+  }
+  state.volumeProfile[priceLevel][isSell ? 'sell' : 'buy'] += qty;
+  
+  // Store trade
+  const trade = { price, qty, usd, isSell, time: Date.now() };
+  state.trades.unshift(trade);
+  if (state.trades.length > 100) state.trades.pop();
+  
+  // Check for large trades
+  if (usd >= cfg.instUSD) {
+    const isWhale = usd >= cfg.whaleUSD;
+    addAlert({
+      type: 'pressure',
+      icon: isWhale ? '🐋' : '💼',
+      message: isWhale ? `WHALE ${isSell ? 'SELL' : 'BUY'} - $${formatUSD(usd)}` : 
+                          `LARGE ${isSell ? 'SELL' : 'BUY'} - $${formatUSD(usd)}`,
+      detail: `${qty.toFixed(2)} @ $${price.toFixed(cfg.dec)}`
+    });
+  }
+  
+  // Detect absorption
+  detectAbsorption(trade);
+  
+  // Update displays
+  updatePriceBar();
+  renderVolumeProfile();
+  drawHeatmap();
+}
+
+// ═══════════════════════════════════════════
+// TICKER HANDLER
+// ═══════════════════════════════════════════
+function handleTicker(d) {
+  state.high24h = parseFloat(d.h);
+  state.low24h = parseFloat(d.l);
+  state.change24h = parseFloat(d.P);
+  if (!state.lastPrice) state.lastPrice = parseFloat(d.c);
+  updatePriceBar();
+}
+
+// ═══════════════════════════════════════════
+// ORDER BOOK UPDATES
+// ═══════════════════════════════════════════
+function updateOrderBook(data) {
+  // Update bids
+  for (const [price, size] of (data.bids || [])) {
+    const sz = parseFloat(size);
+    if (sz === 0) delete state.orderBook.bids[price];
+    else state.orderBook.bids[price] = sz;
+  }
+  
+  // Update asks
+  for (const [price, size] of (data.asks || [])) {
+    const sz = parseFloat(size);
+    if (sz === 0) delete state.orderBook.asks[price];
+    else state.orderBook.asks[price] = sz;
+  }
+  
+  // Detect spoofing
+  detectSpoofing(data);
+  
+  // Update displays
+  document.getElementById('depthInfo').textContent = 
+    `B:${Object.keys(state.orderBook.bids).length} A:${Object.keys(state.orderBook.asks).length}`;
+  
+  detectWalls();
+  drawHeatmap();
+  renderKeyLevels();
+}
+
+// ═══════════════════════════════════════════
+// PATTERN DETECTION - PLAIN ENGLISH
+// ═══════════════════════════════════════════
+
+// Detect Absorption: Large orders being filled without price moving
+function detectAbsorption(trade) {
+  const cfg = SYMBOLS[activeSymbol];
+  const threshold = cfg.instUSD * 0.5; // Half institutional size
+  
+  if (trade.usd < threshold) return;
+  
+  const key = trade.price.toFixed(cfg.dec);
+  if (!state.absorptionTracker[key]) {
+    state.absorptionTracker[key] = { total: 0, count: 0, firstSeen: Date.now() };
+  }
+  
+  const tracker = state.absorptionTracker[key];
+  tracker.total += trade.usd;
+  tracker.count++;
+  
+  // If we see multiple large trades at same price within 30 seconds
+  if (tracker.count >= 3 && (Date.now() - tracker.firstSeen) < 30000) {
+    addAlert({
+      type: 'absorption',
+      icon: '🧽',
+      message: `ABSORPTION at $${key} - Large orders being "eaten"`,
+      detail: `${tracker.count} trades, $${formatUSD(tracker.total)} total`
+    });
+    
+    // Reset tracker
+    state.absorptionTracker[key] = { total: 0, count: 0, firstSeen: Date.now() };
+  }
+}
+
+// Detect Spoofing: Orders appearing/disappearing quickly
+function detectSpoofing(data) {
+  const now = Date.now();
+  const cfg = SYMBOLS[activeSymbol];
+  
+  // Track new large orders
+  const allOrders = [
+    ...Object.entries(data.bids || []).map(([p, s]) => ({ price: parseFloat(p), size: parseFloat(s), side: 'bid' })),
+    ...Object.entries(data.asks || []).map(([p, s]) => ({ price: parseFloat(p), size: parseFloat(s), side: 'ask' }))
+  ];
+  
+  for (const order of allOrders) {
+    const key = `${order.side}_${order.price}`;
+    const threshold = SYMBOLS[activeSymbol].instUSD / order.price; // Convert USD to quantity
+    
+    if (order.size > threshold * 2) { // Very large order
+      if (!state.spoofingTracker[key]) {
+        state.spoofingTracker[key] = { seen: now, size: order.size };
+      } else {
+        const tracker = state.spoofingTracker[key];
+        const age = now - tracker.seen;
+        
+        // If order disappeared within 5 seconds
+        if (age < 5000 && order.size < tracker.size * 0.3) {
+          addAlert({
+            type: 'spoofing',
+            icon: '⚠️',
+            message: `SPOOFING SUSPECTED - Large ${order.side.toUpperCase()} order vanished`,
+            detail: `$${order.price.toFixed(cfg.dec)} - appeared & disappeared in ${age/1000}s`
+          });
+          delete state.spoofingTracker[key];
+        } else {
+          tracker.seen = now;
+          tracker.size = order.size;
+        }
+      }
+    }
+  }
+}
+
+// Detect Walls: Large resting orders
+function detectWalls() {
+  const cfg = SYMBOLS[activeSymbol];
+  const threshold = cfg.instUSD / (state.lastPrice || 1);
+  
+  const walls = [];
+  
+  // Check bids (support)
+  for (const [price, size] of Object.entries(state.orderBook.bids)) {
+    if (size > threshold * 3) {
+      walls.push({
+        type: 'support',
+        price: parseFloat(price),
+        size,
+        strength: size / threshold
+      });
+    }
+  }
+  
+  // Check asks (resistance)
+  for (const [price, size] of Object.entries(state.orderBook.asks)) {
+    if (size > threshold * 3) {
+      walls.push({
+        type: 'resistance',
+        price: parseFloat(price),
+        size,
+        strength: size / threshold
+      });
+    }
+  }
+  
+  // Only alert on new significant walls
+  walls.forEach(wall => {
+    if (wall.strength > 5) {
+      const existing = state.alerts.find(a => 
+        a.type === 'wall' && 
+        Math.abs(a.wallPrice - wall.price) < 0.01
+      );
+      
+      if (!existing) {
+        addAlert({
+          type: 'wall',
+          icon: wall.type === 'support' ? '🛡️' : '🧱',
+          message: `${wall.type === 'support' ? 'BUY WALL' : 'SELL WALL'} forming at $${wall.price.toFixed(cfg.dec)}`,
+          detail: `Strength: ${wall.strength.toFixed(1)}x normal`,
+          wallPrice: wall.price
+        });
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+// ALERT SYSTEM
+// ═══════════════════════════════════════════
+function addAlert(alert) {
+  alert.time = Date.now();
+  state.alerts.unshift(alert);
+  if (state.alerts.length > 50) state.alerts.pop();
+  
+  renderAlerts();
+  
+  // Play sound if enabled
+  if (soundOn) playAlertSound();
+}
+
+function renderAlerts() {
+  const container = document.getElementById('alertScroll');
+  document.getElementById('alertCount').textContent = state.alerts.length;
+  
+  if (state.alerts.length === 0) {
+    container.innerHTML = '<span class="no-alerts">MONITORING ORDER FLOW — NO PATTERNS YET</span>';
+    return;
+  }
+  
+  container.innerHTML = state.alerts.slice(0, 20).map(alert => `
+    <div class="alert-chip ${alert.type}">
+      <div class="chip-message">
+        <span class="chip-icon">${alert.icon}</span>
+        ${alert.message}
+      </div>
+      <div class="chip-detail">${alert.detail}</div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════
+// HEATMAP RENDERING
+// ═══════════════════════════════════════════
+function drawHeatmap() {
+  const canvas = document.getElementById('heatmapCanvas');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  
+  const W = canvas.width;
+  const H = canvas.height;
+  
+  // Clear
+  ctx.fillStyle = '#0a0e17';
+  ctx.fillRect(0, 0, W, H);
+  
+  if (!state.lastPrice) {
+    ctx.fillStyle = '#6b7a90';
+    ctx.font = '14px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText('WAITING FOR ORDER BOOK DATA...', W/2, H/2);
+    return;
+  }
+  
+  const cfg = SYMBOLS[activeSymbol];
+  const midPrice = state.lastPrice;
+  const tickSize = getTickSize();
+  
+  // Calculate visible price range
+  const rows = Math.floor(H / 12);
+  const halfRows = Math.floor(rows / 2);
+  const minPrice = midPrice - (halfRows * tickSize);
+  const maxPrice = midPrice + (halfRows * tickSize);
+  const priceRange = maxPrice - minPrice;
+  
+  // Find max size for color scaling
+  let maxSize = 0;
+  const allSizes = [
+    ...Object.values(state.orderBook.bids),
+    ...Object.values(state.orderBook.asks)
+  ];
+  if (allSizes.length > 0) {
+    allSizes.sort((a, b) => a - b);
+    maxSize = allSizes[Math.floor(allSizes.length * 0.9)] || allSizes[allSizes.length - 1];
+  }
+  
+  // Draw heatmap columns (time-based)
+  const colWidth = Math.max(2, W / 100);
+  
+  // For simplicity, show current order book as vertical bars
+  const barWidth = 80;
+  const centerX = W / 2;
+  
+  // Draw price levels
+  for (let i = 0; i < rows; i++) {
+    const price = minPrice + (i * tickSize);
+    const y = H - ((price - minPrice) / priceRange) * H;
+    
+    const bidSize = state.orderBook.bids[price.toFixed(cfg.dec)] || 0;
+    const askSize = state.orderBook.asks[price.toFixed(cfg.dec)] || 0;
+    
+    if (bidSize > 0 || askSize > 0) {
+      const bidIntensity = bidSize / maxSize;
+      const askIntensity = askSize / maxSize;
+      
+      // Bid bar (left)
+      if (bidSize > 0) {
+        const width = bidIntensity * barWidth;
+        const alpha = 0.3 + (bidIntensity * 0.7);
+        ctx.fillStyle = `rgba(0, 212, 170, ${alpha})`;
+        ctx.fillRect(centerX - barWidth - 2, y - 5, width, 10);
+      }
+      
+      // Ask bar (right)
+      if (askSize > 0) {
+        const width = askIntensity * barWidth;
+        const alpha = 0.3 + (askIntensity * 0.7);
+        ctx.fillStyle = `rgba(255, 71, 87, ${alpha})`;
+        ctx.fillRect(centerX + 2, y - 5, width, 10);
+      }
+    }
+    
+    // Price labels every 5 rows
+    if (i % 5 === 0) {
+      ctx.fillStyle = '#6b7a90';
+      ctx.font = '10px JetBrains Mono';
+      ctx.textAlign = 'right';
+      ctx.fillText(price.toFixed(cfg.dec), centerX - barWidth - 10, y + 3);
+    }
+  }
+  
+  // Current price line
+  const midY = H - ((midPrice - minPrice) / priceRange) * H;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(0, midY);
+  ctx.lineTo(W, midY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Current price label
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(centerX - 40, midY - 8, 80, 16);
+  ctx.fillStyle = '#0a0e17';
+  ctx.font = 'bold 11px JetBrains Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('$' + midPrice.toFixed(cfg.dec), centerX, midY + 4);
+}
+
+// ═══════════════════════════════════════════
+// VOLUME PROFILE
+// ═══════════════════════════════════════════
+function renderVolumeProfile() {
+  const container = document.getElementById('volumeProfile');
+  const vp = state.volumeProfile;
+  
+  if (Object.keys(vp).length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--color-text-dim);font-size:0.75em;padding:20px 0;">Waiting for trades...</div>';
+    return;
+  }
+  
+  // Find POC (Point of Control)
+  let pocPrice = null;
+  let pocVolume = 0;
+  
+  for (const [price, vols] of Object.entries(vp)) {
+    const total = vols.buy + vols.sell;
+    if (total > pocVolume) {
+      pocVolume = total;
+      pocPrice = price;
+    }
+  }
+  
+  // Sort prices
+  const prices = Object.keys(vp).sort((a, b) => parseFloat(b) - parseFloat(a));
+  const maxVol = Math.max(...Object.values(vp).map(v => v.buy + v.sell));
+  
+  container.innerHTML = prices.slice(0, 15).map(price => {
+    const vols = vp[price];
+    const total = vols.buy + vols.sell;
+    const isPOC = price === pocPrice;
+    const buyWidth = maxVol > 0 ? (vols.buy / maxVol) * 100 : 0;
+    const sellWidth = maxVol > 0 ? (vols.sell / maxVol) * 100 : 0;
+    
+    return `
+      <div class="vp-row ${isPOC ? 'vp-poc' : ''}">
+        <div class="vp-price">${parseFloat(price).toFixed(SYMBOLS[activeSymbol].dec)}</div>
+        <div class="vp-bars">
+          <div class="vp-buy" style="width:${buyWidth}%"></div>
+          <div class="vp-sell" style="width:${sellWidth}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// KEY LEVELS
+// ═══════════════════════════════════════════
+function renderKeyLevels() {
+  const container = document.getElementById('keyLevels');
+  const cfg = SYMBOLS[activeSymbol];
+  const threshold = cfg.instUSD / (state.lastPrice || 1);
+  
+  const levels = [];
+  
+  // Find strong support/resistance
+  for (const [price, size] of Object.entries(state.orderBook.bids)) {
+    if (size > threshold * 2) {
+      levels.push({
+        type: 'support',
+        price: parseFloat(price),
+        size,
+        strength: size / threshold
+      });
+    }
+  }
+  
+  for (const [price, size] of Object.entries(state.orderBook.asks)) {
+    if (size > threshold * 2) {
+      levels.push({
+        type: 'resistance',
+        price: parseFloat(price),
+        size,
+        strength: size / threshold
+      });
+    }
+  }
+  
+  // Sort by strength
+  levels.sort((a, b) => b.strength - a.strength);
+  
+  if (levels.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--color-text-dim);font-size:0.75em;padding:20px 0;">Analyzing order book...</div>';
+    return;
+  }
+  
+  container.innerHTML = levels.slice(0, 8).map(level => `
+    <div class="level-item ${level.type}">
+      <div class="level-type">${level.type === 'support' ? '🛡️ SUPPORT' : '🧱 RESISTANCE'}</div>
+      <div class="level-price">$${level.price.toFixed(cfg.dec)}</div>
+      <div class="level-strength">Strength: ${level.strength.toFixed(1)}x</div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════
+// UI UPDATES
+// ═══════════════════════════════════════════
+function updatePriceBar() {
+  const cfg = SYMBOLS[activeSymbol];
+  
+  if (state.lastPrice) {
+    document.getElementById('lastPrice').textContent = '$' + state.lastPrice.toFixed(cfg.dec);
+  }
+  
+  if (state.change24h !== null) {
+    const el = document.getElementById('priceChange');
+    el.textContent = (state.change24h >= 0 ? '+' : '') + state.change24h.toFixed(2) + '%';
+    el.className = 'price-value ' + (state.change24h >= 0 ? 'up' : 'down');
+  }
+  
+  if (state.high24h) {
+    document.getElementById('highPrice').textContent = '$' + state.high24h.toFixed(cfg.dec);
+  }
+  
+  if (state.low24h) {
+    document.getElementById('lowPrice').textContent = '$' + state.low24h.toFixed(cfg.dec);
+  }
+}
+
+// ═══════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════
+function getBucketSize(price) {
+  if (price > 10000) return 10;
+  if (price > 1000) return 1;
+  if (price > 100) return 0.5;
+  return 0.1;
+}
+
+function getTickSize() {
+  const price = state.lastPrice || 1;
+  if (price > 10000) return 10;
+  if (price > 1000) return 1;
+  if (price > 100) return 0.5;
+  return 0.1;
+}
+
+function formatUSD(value) {
+  if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+  if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+  return value.toFixed(0);
+}
+
+function playAlertSound() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.1);
+  } catch (e) {}
+}
+
+// ═══════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════
+function switchSymbol(symbol) {
+  activeSymbol = symbol;
+  
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + symbol).classList.add('active');
+  
+  // Reset state
+  state.orderBook = { bids: {}, asks: {} };
+  state.trades = [];
+  state.volumeProfile = {};
+  state.alerts = [];
+  state.spoofingTracker = {};
+  state.absorptionTracker = {};
+  
+  // Reconnect
+  connect();
+  connectDepth();
+  
+  // Clear displays
+  document.getElementById('alertScroll').innerHTML = '<span class="no-alerts">MONITORING ORDER FLOW — NO PATTERNS YET</span>';
+  document.getElementById('alertCount').textContent = '0';
+  
+  updatePriceBar();
+  renderVolumeProfile();
+  renderKeyLevels();
+  drawHeatmap();
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  const btn = document.getElementById('soundBtn');
+  btn.textContent = soundOn ? '🔊 ON' : '🔊 OFF';
+  btn.classList.toggle('active', soundOn);
+}
+
+function toggleView() {
+  // Future: Add candlestick chart view
+  alert('Chart view coming soon!');
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const time = now.toTimeString().split(' ')[0];
+  document.getElementById('clock').textContent = time;
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+// Resize handler
+window.addEventListener('resize', () => {
+  drawHeatmap();
+});
+
+// Initialize
+document.getElementById('loadingOverlay').style.display = 'none';
+connect();
+connectDepth();
+drawHeatmap();
+
+console.log('✅ BOOKMAP PRO initialized');
+console.log('📊 Monitoring:', activeSymbol);
+console.log('🔗 Connected to Binance WebSocket');
+</script>
+
+</body>
+</html>
