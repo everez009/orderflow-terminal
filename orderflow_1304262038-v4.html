@@ -407,6 +407,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     <button class="ibtn on" id="vpBtn" onclick="toggleVP()">VP ON</button>
     <button class="ibtn amb" id="hmBtn" onclick="cycleView()">FOOTPRINT</button>
     <button class="ibtn" onclick="cycleFontSize()">Aa</button>
+    <button class="ibtn" id="htfBiasBtn" onclick="toggleHTFBias()" title="Higher Timeframe Bias Filter">📊 HTF OFF</button>
     <button class="ibtn" onclick="openSettings()">⚙ ALERTS</button>
     <button class="ibtn" id="wakeLockBtn" onclick="toggleWakeLock()" title="Keep screen awake (mobile)">🔒 AWAKE</button>
     <button class="ibtn" onclick="resetSession()" title="Reset session volume profile">🔄 RESET</button>
@@ -669,8 +670,7 @@ const SYMS={
 const TF_MS={1:60000,5:300000,15:900000,60:3600000};
 const TF_KLINE={1:'1m',5:'5m',15:'15m',60:'1h'};
 
-// ═══════════════════════════════════════════
-// TRADING MODE CONFIGURATION
+// Trading Mode Configuration
 // Different signal thresholds for different styles
 // ═══════════════════════════════════════════
 const TRADING_MODES = {
@@ -742,6 +742,10 @@ let tradeJournal = [];
 // Volume Profile persistence
 let vpSessionStart = null; // When current session started (ISO string)
 let wakeLock = null; // Prevent screen sleep on mobile
+
+// HTF Bias Configuration
+let htfBiasEnabled = false; // Toggle for HTF bias filtering
+let htfBiasData = { h1: 0, h4: 0, daily: 0 }; // HTF bias scores (-100 to +100)
 
 // Load journal from localStorage on startup
 function loadJournal() {
@@ -964,6 +968,77 @@ document.addEventListener('visibilitychange', async () => {
   }
 });
 
+// ═══════════════════════════════════════════
+// HTF BIAS CALCULATION
+// Analyzes 1H, 4H trends for signal filtering
+// ═══════════════════════════════════════════
+
+async function calculateHTFBias() {
+  try {
+    const sym = SYMS[activeSym].klSym;
+    
+    // Fetch 1H data (last 50 candles)
+    const h1Response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1h&limit=50`);
+    const h1Data = await h1Response.json();
+    
+    // Fetch 4H data (last 30 candles)
+    const h4Response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=4h&limit=30`);
+    const h4Data = await h4Response.json();
+    
+    // Calculate 1H bias
+    const h1Bias = calculateTrendBias(h1Data, 20); // 20-period EMA proxy
+    
+    // Calculate 4H bias
+    const h4Bias = calculateTrendBias(h4Data, 10); // 10-period EMA proxy
+    
+    // Weighted combination (4H more important)
+    const combinedBias = (h1Bias * 0.4 + h4Bias * 0.6);
+    
+    htfBiasData = { h1: h1Bias, h4: h4Bias, daily: combinedBias };
+    
+    console.log(`📊 HTF Bias: 1H=${h1Bias.toFixed(1)}, 4H=${h4Bias.toFixed(1)}, Combined=${combinedBias.toFixed(1)}`);
+    
+    return combinedBias;
+  } catch(e) {
+    console.error('Failed to calculate HTF bias:', e);
+    return 0; // Neutral on error
+  }
+}
+
+// Simple trend bias calculation using price position vs average
+function calculateTrendBias(klineData, period) {
+  if (!klineData || klineData.length < period) return 0;
+  
+  const closes = klineData.map(k => parseFloat(k[4]));
+  const recentCloses = closes.slice(-period);
+  const avgPrice = recentCloses.reduce((a, b) => a + b, 0) / period;
+  const currentPrice = closes[closes.length - 1];
+  
+  // Calculate bias: +100 = strongly bullish, -100 = strongly bearish
+  const pctDiff = (currentPrice - avgPrice) / avgPrice * 100;
+  const bias = Math.max(-100, Math.min(100, pctDiff * 10)); // Scale to -100 to +100
+  
+  return bias;
+}
+
+// Toggle HTF bias filtering
+function toggleHTFBias() {
+  htfBiasEnabled = !htfBiasEnabled;
+  const btn = document.getElementById('htfBiasBtn');
+  
+  if (htfBiasEnabled) {
+    btn.textContent = '📊 HTF ON';
+    btn.classList.add('on');
+    console.log('✅ HTF Bias filtering ENABLED');
+    // Calculate initial bias
+    calculateHTFBias();
+  } else {
+    btn.textContent = '📊 HTF OFF';
+    btn.classList.remove('on');
+    console.log('⏸️ HTF Bias filtering DISABLED');
+  }
+}
+
 // Save journal to localStorage
 function saveJournal() {
   try {
@@ -1097,29 +1172,33 @@ function checkSmartExits() {
   const openTrades = tradeJournal.filter(t => t.status === 'open');
   if (openTrades.length === 0) return;
   
+  let exitsChecked = 0;
+  let exitsTriggered = 0;
+  
   openTrades.forEach(trade => {
     const s = ST[trade.symbol];
     if (!s || !s.last) return;
     
     const currentPrice = s.last;
+    exitsChecked++;
     
     // Check if TP or SL hit
     let exitPrice = null;
     let exitReason = null;
     
     if (trade.type === 'buy') {
-      if (currentPrice >= trade.takeProfit) {
+      if (trade.takeProfit && currentPrice >= trade.takeProfit) {
         exitPrice = trade.takeProfit;
         exitReason = 'tp_hit';
-      } else if (currentPrice <= trade.stopLoss) {
+      } else if (trade.stopLoss && currentPrice <= trade.stopLoss) {
         exitPrice = trade.stopLoss;
         exitReason = 'sl_hit';
       }
     } else { // sell
-      if (currentPrice <= trade.takeProfit) {
+      if (trade.takeProfit && currentPrice <= trade.takeProfit) {
         exitPrice = trade.takeProfit;
         exitReason = 'tp_hit';
-      } else if (currentPrice >= trade.stopLoss) {
+      } else if (trade.stopLoss && currentPrice >= trade.stopLoss) {
         exitPrice = trade.stopLoss;
         exitReason = 'sl_hit';
       }
@@ -1129,8 +1208,17 @@ function checkSmartExits() {
     if (exitReason) {
       closeTrade(trade.id, exitPrice, exitReason);
       console.log(`🎯 Smart Exit: ${trade.type.toUpperCase()} ${trade.symbol} - ${exitReason === 'tp_hit' ? '✓ TP HIT' : '✗ SL HIT'} at $${exitPrice.toFixed(2)}`);
+      exitsTriggered++;
     }
   });
+  
+  // Debug logging every 60 seconds
+  if (Date.now() % 60000 < 1000 && openTrades.length > 0) {
+    console.log(`📊 Smart Exit Check: ${exitsChecked} trades checked, ${exitsTriggered} exits triggered`);
+    openTrades.forEach(t => {
+      console.log(`   • ${t.type.toUpperCase()} ${t.symbol} | Entry: $${t.entryPrice.toFixed(2)} | SL: $${t.stopLoss?.toFixed(2) || 'N/A'} | TP: $${t.takeProfit?.toFixed(2) || 'N/A'} | Current: $${ST[t.symbol]?.last?.toFixed(2) || 'N/A'}`);
+    });
+  }
 }
 
 // Render journal entries in the panel
@@ -1700,11 +1788,14 @@ function onTrade(sym,d){
     const isW=usd>=cfg.whaleUSD;
     tr.tag=isW?'whale':'inst';
     
+    console.log(`🔍 Large trade detected: ${isW ? '🐋 WHALE' : '🏛 INST'} | $${usd.toLocaleString()} | ${sell ? 'SELL' : 'BUY'} @ $${p.toFixed(2)}`);
+    
     // Check cooldown - don't fire alerts too frequently (8 second minimum)
     const now=Date.now();
     const lastAlertTime=s.lastTradeAlert||0;
     if(now-lastAlertTime<8000) {
       // Still record the trade but skip the alert notification
+      console.log(`⏸️ Alert skipped (cooldown active, ${(8000-(now-lastAlertTime))/1000}s remaining)`);
       s.lastTradeAlert=now;
       s.trades.unshift(tr);
       if(s.trades.length>300)s.trades.pop();
@@ -1737,27 +1828,33 @@ function onTrade(sym,d){
       alertType = !sell ? 'ABSORPTION DETECTED' : 'ABSORPTION DETECTED';
       alertNote = !sell ? 'Buyers absorbing all sell orders' : 'Sellers absorbing all buy orders';
       alertEmoji = '🧽';
+      console.log(`🧽 ABSORPTION ALERT: ${alertNote} | $${usd.toLocaleString()}`);
     } else if (isAggressivePressure && !sell) {
       alertType = 'STRONG BUY PRESSURE';
       alertNote = 'Aggressive buying detected';
       alertEmoji = '💪';
+      console.log(`💪 AGGRESSIVE BUY: ${sameDirectionCount} streak, ${avgRecentTrade.toLocaleString()} avg`);
     } else if (isAggressivePressure && sell) {
       alertType = 'STRONG SELL PRESSURE';
       alertNote = 'Aggressive selling detected';
       alertEmoji = '💥';
+      console.log(`💥 AGGRESSIVE SELL: ${sameDirectionCount} streak, ${avgRecentTrade.toLocaleString()} avg`);
     } else if (isWallFormation) {
       // Wall forming - check if it's buy or sell wall based on trade direction
       alertType = !sell ? 'BUY WALL FORMING' : 'SELL WALL FORMING';
       alertNote = !sell ? 'Large buy orders stacking up' : 'Large sell orders stacking up';
       alertEmoji = '🧱';
+      console.log(`🧱 WALL FORMATION: ${(q/avgTradeSize).toFixed(1)}x avg size`);
     } else if (isW && usd >= cfg.whaleUSD * 2) {
       // Only alert on VERY large whale trades
       alertType = sell ? 'WHALE SELLING' : 'WHALE BUYING';
       alertNote = usd >= cfg.whaleUSD * 5 ? 'Mega whale activity detected' : 'Large whale transaction';
       alertEmoji = '🐋';
+      console.log(`🐋 MEGA WHALE: ${(usd/cfg.whaleUSD).toFixed(1)}x threshold`);
     } else {
       // Skip institutional trades unless they're exceptionally large
       if(usd < cfg.whaleUSD * 1.5) {
+        console.log(`⏭️ Institutional trade below 1.5× whale threshold ($${(cfg.whaleUSD * 1.5).toLocaleString()}), no alert fired`);
         s.trades.unshift(tr);
         if(s.trades.length>300)s.trades.pop();
         if(sym===activeSym)schedRender();
@@ -1766,11 +1863,19 @@ function onTrade(sym,d){
       alertType = sell ? 'INSTITUTIONAL SELL' : 'INSTITUTIONAL BUY';
       alertNote = 'Institutional-sized trade detected';
       alertEmoji = '🏛';
+      console.log(`🏛 INSTITUTIONAL ALERT: ${(usd/cfg.whaleUSD).toFixed(1)}x whale threshold`);
     }
     
     const al={t:ts,sym,type:alertType,p,q,usd,note:alertNote,isW,emoji:alertEmoji};
     s.alerts.unshift(al);
     if(s.alerts.length>200)s.alerts.pop();
+    
+    console.log(`✅ ALERT FIRED: ${alertEmoji} ${alertType} | ${sym} | $${usd.toLocaleString()} @ $${p.toFixed(2)}`);
+    console.log(`   → Visual chip: ${sym===activeSym ? 'YES (active)' : 'NO (background)'}`);
+    console.log(`   → Voice: ${soundOn ? 'ENABLED' : 'DISABLED'}`);
+    console.log(`   → Telegram: ${c.tgTok&&c.tgCid ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
+    console.log(`   → WhatsApp: ${c.waNr&&c.waKey ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
+    
     // Show chip ONLY for active symbol — background alerts stored and shown on tab switch
     if(sym===activeSym) addChip(al);
     // Notifications (voice/Telegram/WhatsApp) fire for ALL symbols regardless of tab
@@ -3049,6 +3154,11 @@ setInterval(()=>{
   if (Date.now() % 30000 < 1000) {
     saveAllVP();
   }
+  
+  // Recalculate HTF bias every 5 minutes if enabled
+  if (htfBiasEnabled && Date.now() % 300000 < 1000) {
+    calculateHTFBias();
+  }
 
   // Smart Exit Detection - check if any open trades hit TP or SL
   checkSmartExits();
@@ -3156,6 +3266,18 @@ function evalSignal(){
   });
   const whaleBuyConf=whaleAtLevel('buy');
   const whaleSellConf=whaleAtLevel('sell');
+  
+  // ── CONDITION 8: HTF Bias (if enabled) ───────────────────────
+  let htfBullish = false;
+  let htfBearish = false;
+  if (htfBiasEnabled && htfBiasData.daily !== undefined) {
+    htfBullish = htfBiasData.daily > 20;   // Bullish if combined bias > +20
+    htfBearish = htfBiasData.daily < -20;  // Bearish if combined bias < -20
+  } else {
+    // If disabled or not calculated yet, treat as neutral (pass)
+    htfBullish = true;
+    htfBearish = true;
+  }
 
   // ── SCORE & DECIDE ────────────────────────────────────────────
   const buyConditions=[
@@ -3166,6 +3288,7 @@ function evalSignal(){
     {label:'CUMUL Δ +',   pass:cumulBull,       required:false},
     {label:'BID WALL',    pass:cobBidWall,      required:false},
     {label:'WHALE BUY',   pass:whaleBuyConf,    required:false},
+    {label:'HTF BIAS +',  pass:htfBullish,      required:false},
   ];
   const sellConditions=[
     {label:'AT RESISTANCE',pass:atResistance,   required:true},
@@ -3175,6 +3298,7 @@ function evalSignal(){
     {label:'CUMUL Δ -',    pass:cumulBear,      required:false},
     {label:'ASK WALL',     pass:cobAskWall,     required:false},
     {label:'WHALE SELL',   pass:whaleSellConf,  required:false},
+    {label:'HTF BIAS -',   pass:htfBearish,     required:false},
   ];
 
   const scoreSet=(conds)=>{
@@ -3258,7 +3382,8 @@ function evalSignal(){
       ?`Near support $${nearSupport?.p.toFixed(cfg.dec)||'--'}`
       :`Near resistance $${nearResistance?.p.toFixed(cfg.dec)||'--'}`;
     const modeName = TRADING_MODES[activeMode].name;
-    metaDiv.innerHTML=`<div>${levelLabel}</div><div style="color:var(--dim)">FP: B${fpBuyDelta.toFixed(2)} S${fpSellDelta.toFixed(2)} · VP: ${sessionBuyPct.toFixed(0)}% buy · Mode: ${modeName}</div>`;
+    const htfInfo = htfBiasEnabled ? ` · HTF: ${htfBiasData.daily > 0 ? '🟢' : htfBiasData.daily < 0 ? '🔴' : '⚪'}${htfBiasData.daily.toFixed(0)}` : '';
+    metaDiv.innerHTML=`<div>${levelLabel}</div><div style="color:var(--dim)">FP: B${fpBuyDelta.toFixed(2)} S${fpSellDelta.toFixed(2)} · VP: ${sessionBuyPct.toFixed(0)}% buy · Mode: ${modeName}${htfInfo}</div>`;
 
     // Fire notifications on NEW signal (direction change or cooldown expired)
     const isNew=(direction!==lastSignal)||(now-lastSignalTime>SIGNAL_COOLDOWN);
@@ -4227,14 +4352,29 @@ function updateThresh(){
 
 // NOTIFICATIONS
 function fireNotifs(a){
-  if(soundOn) speak(a);
+  console.log(`📡 fireNotifs called for: ${a.type} | Sound: ${soundOn}, TG: ${getCfg().tgTok&&getCfg().tgCid ? 'YES' : 'NO'}, WA: ${getCfg().waNr&&getCfg().waKey ? 'YES' : 'NO'}`);
+  
+  if(soundOn) {
+    console.log('🔊 Attempting voice alert...');
+    speak(a);
+  }
+  
   const c=getCfg();
-  if(c.tgTok&&c.tgCid) sendTG(a,c);
+  if(c.tgTok&&c.tgCid) {
+    console.log('📱 Sending Telegram notification...');
+    sendTG(a,c);
+  } else {
+    console.log('⚠️ Telegram not configured (missing token or chat ID)');
+  }
+  
   if(c.waNr&&c.waKey){
+    console.log('💬 Sending WhatsApp notification...');
     const symLabel=SYMS[a.sym]?.label||a.sym;
     const emoji = a.emoji || (a.isW ? '🐋' : '🏛');
     const waMsg=`${emoji} ${a.type} - ${symLabel} - $${a.p.toFixed(2)} - ${fUSD(a.usd)} - ${a.note} - ${new Date(a.t).toUTCString().slice(17,25)} UTC`;
     sendWA(waMsg,c);
+  } else {
+    console.log('⚠️ WhatsApp not configured (missing phone or API key)');
   }
 }
 // Voice alert cooldown tracking
@@ -4292,6 +4432,7 @@ function saveSettings(){
     const el=document.getElementById(k); if(el) localStorage.setItem(k,el.value.trim());
   });
   closeSettings();
+  console.log('✅ Settings saved to localStorage (will persist across code updates)');
 }
 
 async function testTG(){
@@ -4559,6 +4700,15 @@ async function boot(){
     vpSessionStart = localStorage.getItem('orderflow_session_start') || new Date().toISOString();
     localStorage.setItem('orderflow_session_start', vpSessionStart);
   }
+  
+  // Verify notification settings persistence
+  const notifCfg = getCfg();
+  console.log('🔔 Notification Settings Check:');
+  console.log(`   Telegram Token: ${notifCfg.tgTok ? '✅ SET (' + notifCfg.tgTok.substring(0, 10) + '...)' : '❌ NOT SET'}`);
+  console.log(`   Telegram Chat ID: ${notifCfg.tgCid ? '✅ SET' : '❌ NOT SET'}`);
+  console.log(`   WhatsApp Phone: ${notifCfg.waNr ? '✅ SET' : '❌ NOT SET'}`);
+  console.log(`   WhatsApp API Key: ${notifCfg.waKey ? '✅ SET' : '❌ NOT SET'}`);
+  console.log('   ℹ️ Settings persist in localStorage - they survive code updates!');
   
   resizeChart();
   setupVPResize();
