@@ -215,6 +215,46 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .stitle{color:var(--cyan);font-size:.73em;letter-spacing:2px;margin-bottom:7px;font-family:var(--disp);padding-bottom:4px;border-bottom:1px solid var(--border);}
 
 /* ═══════════════════════════════════════════
+   MODE SELECTOR STYLES
+   ═══════════════════════════════════════════ */
+.mode-selector{display:flex;gap:3px;align-items:center}
+.mode-btn{
+  background:rgba(10,20,40,.6);
+  border:1px solid var(--border);
+  color:var(--dim);
+  padding:4px 10px;
+  font-size:.7em;
+  font-family:var(--mono);
+  cursor:pointer;
+  border-radius:3px;
+  transition:all .15s ease;
+  letter-spacing:1px;
+}
+.mode-btn:hover{
+  background:rgba(20,40,80,.8);
+  color:var(--cyan);
+  border-color:var(--cyan);
+}
+.mode-btn.on{
+  background:rgba(0,255,136,.15);
+  border-color:var(--green);
+  color:var(--green);
+  box-shadow:0 0 8px rgba(0,255,136,.3);
+}
+.mode-btn#modeScalp.on{
+  background:rgba(255,165,0,.15);
+  border-color:#ffa500;
+  color:#ffa500;
+  box-shadow:0 0 8px rgba(255,165,0,.3);
+}
+.mode-btn#modeSwing.on{
+  background:rgba(138,43,226,.15);
+  border-color:#8a2be2;
+  color:#8a2be2;
+  box-shadow:0 0 8px rgba(138,43,226,.3);
+}
+
+/* ═══════════════════════════════════════════
    MOBILE RESPONSIVE DESIGN
    ═══════════════════════════════════════════ */
 
@@ -230,6 +270,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   .stabs{order:1;width:100%;justify-content:center;}
   .stab{padding:5px 10px;font-size:.7em;}
   .cr{order:2;width:100%;justify-content:center;flex-wrap:wrap;}
+  .mode-selector{order:1;margin-right:0;margin-bottom:4px;}
+  .mode-btn{padding:4px 8px;font-size:.65em;}
   .tfg{order:1;}
   .sep{display:none;}
   .ibtn{padding:3px 6px;font-size:.7em;}
@@ -303,6 +345,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 @media (max-width: 480px) {
   .title{font-size:.8em;letter-spacing:1px;}
   .stab{padding:4px 8px;font-size:.65em;}
+  .mode-btn{padding:3px 6px;font-size:.6em;}
   .tfb{padding:2px 6px;font-size:.65em;}
   .pbar{grid-template-columns:repeat(2,1fr);}
   .chart-wrap{height:180px !important;}
@@ -346,6 +389,13 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     <button class="stab"    onclick="switchSym('BTCUSDT')"  id="tab-BTCUSDT">BTC/USDT</button>
   </div>
   <div class="cr">
+    <!-- Trading Mode Selector -->
+    <div class="mode-selector" style="display:flex;gap:3px;margin-right:8px">
+      <button class="mode-btn" id="modeScalp" onclick="setTradingMode('scalp')" title="Scalping: Fast signals, lower threshold">⚡ SCALP</button>
+      <button class="mode-btn on" id="modeDay" onclick="setTradingMode('day')" title="Day Trading: Balanced signals">📊 DAY</button>
+      <button class="mode-btn" id="modeSwing" onclick="setTradingMode('swing')" title="Swing Trading: High quality, fewer signals">🎯 SWING</button>
+    </div>
+    <div class="sep"></div>
     <div class="tfg">
       <button class="tfb"    onclick="switchTF(1)"  id="tf-1">1M</button>
       <button class="tfb"    onclick="switchTF(5)"  id="tf-5">5M</button>
@@ -618,6 +668,42 @@ const SYMS={
 };
 const TF_MS={1:60000,5:300000,15:900000,60:3600000};
 const TF_KLINE={1:'1m',5:'5m',15:'15m',60:'1h'};
+
+// ═══════════════════════════════════════════
+// TRADING MODE CONFIGURATION
+// Different signal thresholds for different styles
+// ═══════════════════════════════════════════
+const TRADING_MODES = {
+  scalp: {
+    name: 'Scalping',
+    icon: '⚡',
+    description: 'Fast signals, lower threshold, more trades',
+    optionalRequired: 1,     // Need at least 1 optional condition (vs 2)
+    starThreshold: 0.2,      // Show 2+ stars at 20% optional pass rate
+    alertStars: 0.2,         // Alert on 20%+ (1★+)
+    color: '#ffa500'
+  },
+  day: {
+    name: 'Day Trading',
+    icon: '📊',
+    description: 'Balanced signals, moderate frequency',
+    optionalRequired: 2,     // Need at least 2 optional conditions
+    starThreshold: 0.4,      // Show 2+ stars at 40% optional pass rate
+    alertStars: 0.4,         // Alert on 40%+ (2★+)
+    color: '#00ff88'
+  },
+  swing: {
+    name: 'Swing Trading',
+    icon: '🎯',
+    description: 'High quality signals, fewer trades, higher confidence',
+    optionalRequired: 3,     // Need at least 3 optional conditions
+    starThreshold: 0.6,      // Show 2+ stars at 60% optional pass rate
+    alertStars: 0.6,         // Alert on 60%+ (3★+)
+    color: '#8a2be2'
+  }
+};
+
+let activeMode = 'day'; // Default to day trading mode
 
 let activeSym='PAXGUSDT', activeTF=15;
 let soundOn=false, vpOn=true;
@@ -1964,6 +2050,52 @@ function cycleView(){
 }
 
 // ═══════════════════════════════════════════
+// TRADING MODE FUNCTIONS
+// ═══════════════════════════════════════════
+function setTradingMode(mode){
+  if(!TRADING_MODES[mode]) return;
+  
+  activeMode = mode;
+  const config = TRADING_MODES[mode];
+  
+  // Update UI buttons
+  document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('on'));
+  document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('on');
+  
+  // Save to localStorage
+  try {
+    localStorage.setItem('orderflow_trading_mode', mode);
+  } catch(e) {
+    console.warn('Could not save trading mode:', e);
+  }
+  
+  console.log(`🎯 Trading mode changed to: ${config.icon} ${config.name.toUpperCase()} - ${config.description}`);
+  console.log(`   • Optional conditions required: ${config.optionalRequired}/5`);
+  console.log(`   • Alert threshold: ${(config.alertStars * 100).toFixed(0)}% (${Math.ceil(config.alertStars * 5)}★+)`);
+  
+  // Re-evaluate signals with new thresholds
+  renderAll();
+}
+
+function loadTradingMode(){
+  try {
+    const saved = localStorage.getItem('orderflow_trading_mode');
+    if(saved && TRADING_MODES[saved]){
+      activeMode = saved;
+      console.log(`✅ Loaded trading mode from storage: ${TRADING_MODES[saved].name}`);
+      
+      // Update UI
+      document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('on'));
+      const modeKey = 'mode' + saved.charAt(0).toUpperCase() + saved.slice(1);
+      const btn = document.getElementById(modeKey);
+      if(btn) btn.classList.add('on');
+    }
+  } catch(e) {
+    console.warn('Could not load trading mode:', e);
+  }
+}
+
+// ═══════════════════════════════════════════
 // BOOKMAP HEATMAP ENGINE
 // ═══════════════════════════════════════════
 // Order book: { bids:{price:size}, asks:{price:size} }
@@ -3054,23 +3186,27 @@ function evalSignal(){
   const buyScore=scoreSet(buyConditions);
   const sellScore=scoreSet(sellConditions);
 
+  // Get current mode configuration
+  const modeConfig = TRADING_MODES[activeMode];
+  const optionalRequired = modeConfig.optionalRequired;
+
   // Debug logging - check why no signal
   if(!buyScore.reqPass || !sellScore.reqPass) {
-    console.log('🔍 Signal Check:', {
+    console.log(`🔍 Signal Check [${modeConfig.icon} ${modeConfig.name.toUpperCase()}]:`, {
       atSupport,
       atResistance,
       fpBullish,
       fpBearish,
       buyRequiredPass: buyScore.reqPass,
       sellRequiredPass: sellScore.reqPass,
-      buyOptional: buyScore.score,
-      sellOptional: sellScore.score
+      buyOptional: `${buyScore.score}/${optionalRequired} required`,
+      sellOptional: `${sellScore.score}/${optionalRequired} required`
     });
   }
 
-  // Need both required conditions + at least 2 optional
-  const buySignal=buyScore.reqPass&&buyScore.score>=2;
-  const sellSignal=sellScore.reqPass&&sellScore.score>=2;
+  // Need both required conditions + mode-specific optional count
+  const buySignal=buyScore.reqPass&&buyScore.score>=optionalRequired;
+  const sellSignal=sellScore.reqPass&&sellScore.score>=optionalRequired;
 
   // Stars (1-5): 2 optional = 1★, 3=2★★, 4=3★★★, 5=4★★★★, all=5★★★★★
   const stars=(score,total)=>{
@@ -3107,7 +3243,8 @@ function evalSignal(){
     const starStr=stars(activeScore.score,activeScore.total);
     dot.className='sig-dot '+direction;
     lbl.className='sig-label '+direction;
-    lbl.textContent=(direction==='buy'?'▲ BUY SIGNAL':'▼ SELL SIGNAL')+' '+starStr;
+    const modeIcon = TRADING_MODES[activeMode].icon;
+    lbl.textContent=`${modeIcon} ${(direction==='buy'?'▲ BUY SIGNAL':'▼ SELL SIGNAL')} ${starStr}`;
     bar.style.borderBottomColor=direction==='buy'?'rgba(0,255,136,.5)':'rgba(255,51,85,.5)';
     bar.style.background=direction==='buy'?'rgba(0,20,10,.6)':'rgba(20,0,5,.6)';
 
@@ -3120,14 +3257,15 @@ function evalSignal(){
     const levelLabel=direction==='buy'
       ?`Near support $${nearSupport?.p.toFixed(cfg.dec)||'--'}`
       :`Near resistance $${nearResistance?.p.toFixed(cfg.dec)||'--'}`;
-    metaDiv.innerHTML=`<div>${levelLabel}</div><div style="color:var(--dim)">FP: B${fpBuyDelta.toFixed(2)} S${fpSellDelta.toFixed(2)} · VP: ${sessionBuyPct.toFixed(0)}% buy</div>`;
+    const modeName = TRADING_MODES[activeMode].name;
+    metaDiv.innerHTML=`<div>${levelLabel}</div><div style="color:var(--dim)">FP: B${fpBuyDelta.toFixed(2)} S${fpSellDelta.toFixed(2)} · VP: ${sessionBuyPct.toFixed(0)}% buy · Mode: ${modeName}</div>`;
 
     // Fire notifications on NEW signal (direction change or cooldown expired)
     const isNew=(direction!==lastSignal)||(now-lastSignalTime>SIGNAL_COOLDOWN);
     if(isNew){
-      // Only alert on 3+ stars (score/total >= 0.6)
+      // Only alert on mode-specific star threshold
       const starPct=activeScore.score/activeScore.total;
-      if(starPct>=0.6){
+      if(starPct>=modeConfig.alertStars){
         lastSignal=direction; lastSignalTime=now;
         
         // Update risk calculator with signal type for correct SL/TP
@@ -3149,7 +3287,9 @@ function evalSignal(){
     // No signal
     dot.className='sig-dot none';
     lbl.className='sig-label none';
-    lbl.textContent='SCANNING...';
+    const modeIcon = TRADING_MODES[activeMode].icon;
+    const modeName = TRADING_MODES[activeMode].name;
+    lbl.textContent=`${modeIcon} SCANNING... (${modeName})`;
     bar.style.borderBottomColor='var(--border)';
     bar.style.background='var(--bg2)';
     // Show condition status quietly
@@ -4404,6 +4544,9 @@ async function boot(){
   // Initialize trade management system
   loadJournal();
   updateRiskCalc();
+  
+  // Load trading mode preference
+  loadTradingMode();
   
   // Check if new trading day (midnight UTC reset)
   const isNewDay = shouldResetSession();
