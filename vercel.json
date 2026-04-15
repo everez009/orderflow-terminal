@@ -9,11 +9,11 @@
   "routes": [
     {
       "src": "/",
-      "dest": "/orderflow.html"
+      "dest": "/orderflow_1304262038-v4.html"
     },
     {
-      "src": "/orderflow.html",
-      "dest": "/orderflow.html"
+      "src": "/orderflow_1304262038-v4.html",
+      "dest": "/orderflow_1304262038-v4.html"
     }
   ]
 }
