@@ -8,12 +8,16 @@
   ],
   "routes": [
     {
-      "src": "/",
-      "dest": "/orderflow.html"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     },
     {
-      "src": "/orderflow.html",
-      "dest": "/orderflow.html"
+      "src": "/",
+      "dest": "/orderflow_1304262038-v4.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }

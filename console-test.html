@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Console Test - OrderFlow</title>
+    <style>
+        body {
+            background: #0a0e17;
+            color: #fff;
+            font-family: monospace;
+            padding: 40px;
+            text-align: center;
+        }
+        .box {
+            background: #131722;
+            border: 2px solid #2962ff;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #2962ff;
+            margin-bottom: 20px;
+        }
+        .step {
+            background: #1e222d;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: left;
+        }
+        .key {
+            background: #2962ff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        button {
+            background: #2962ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover {
+            background: #1e54e6;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #0d1117;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>🔍 Console Test for OrderFlow Terminal</h1>
+        
+        <div class="step">
+            <strong>Step 1:</strong> Open Browser Console
+            <br><br>
+            Press <span class="key">F12</span> or <span class="key">Ctrl+Shift+J</span> (Windows) / <span class="key">Cmd+Option+J</span> (Mac)
+        </div>
+
+        <div class="step">
+            <strong>Step 2:</strong> Click the buttons below to test
+        </div>
+
+        <button onclick="testConsole()">Test Console Log</button>
+        <button onclick="testSpeech()">Test Voice Alert</button>
+        <button onclick="testSettings()">Check Settings</button>
+
+        <div id="result">Click buttons to see results here AND in console...</div>
+    </div>
+
+    <script>
+        function testConsole() {
+            console.log('✅ CONSOLE IS WORKING!');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('📊 This message should appear in your browser console');
+            console.log('🔍 If you see this, console logging is functional');
+            console.log('💡 Now open the actual OrderFlow terminal and check console there');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            document.getElementById('result').innerHTML = 
+                '✅ Console test successful!<br>' +
+                'Check your browser console (F12) to see the messages above.';
+        }
+
+        function testSpeech() {
+            console.log('🔊 Testing voice alert...');
+            
+            const msg = 'This is a test of the voice alert system. If you hear this, sound is working correctly.';
+            const utterance = new SpeechSynthesisUtterance(msg);
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            utterance.onstart = () => {
+                console.log('🔊 Voice started speaking');
+                document.getElementById('result').innerHTML = '🔊 Voice alert playing...';
+            };
+            
+            utterance.onend = () => {
+                console.log('✅ Voice alert completed');
+                document.getElementById('result').innerHTML += '<br>✅ Voice test complete!';
+            };
+            
+            utterance.onerror = (e) => {
+                console.error('❌ Voice error:', e);
+                document.getElementById('result').innerHTML = '❌ Voice test failed: ' + e.error;
+            };
+            
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function testSettings() {
+            console.log('🔔 Checking notification settings...');
+            console.log('Telegram Token:', localStorage.getItem('tgTok') ? '✅ SET' : '❌ NOT SET');
+            console.log('Telegram Chat ID:', localStorage.getItem('tgCid') ? '✅ SET' : '❌ NOT SET');
+            console.log('WhatsApp Phone:', localStorage.getItem('waNr') ? '✅ SET' : '❌ NOT SET');
+            console.log('WhatsApp API Key:', localStorage.getItem('waKey') ? '✅ SET' : '❌ NOT SET');
+            
+            const tgTok = localStorage.getItem('tgTok') ? '✅' : '❌';
+            const tgCid = localStorage.getItem('tgCid') ? '✅' : '❌';
+            const waNr = localStorage.getItem('waNr') ? '✅' : '❌';
+            const waKey = localStorage.getItem('waKey') ? '✅' : '❌';
+            
+            document.getElementById('result').innerHTML = 
+                'Settings Status:<br>' +
+                `Telegram Token: ${tgTok}<br>` +
+                `Telegram Chat ID: ${tgCid}<br>` +
+                `WhatsApp Phone: ${waNr}<br>` +
+                `WhatsApp API Key: ${waKey}<br><br>` +
+                'See console for details.';
+        }
+
+        // Auto-run on load
+        window.onload = () => {
+            console.log('🚀 Console Test Page Loaded');
+            console.log('👉 Click the buttons above to test functionality');
+            console.log('ℹ️  Then open the actual OrderFlow terminal to check its console');
+        };
+    </script>
+</body>
+</html>
