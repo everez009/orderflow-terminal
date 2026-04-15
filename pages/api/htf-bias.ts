@@ -26,13 +26,15 @@ export default async function handler(
 
     // Fetch 1H data (last 50 candles)
     const h1Response = await axios.get(
-      `https://api.binance.com/api/v3/klines?symbol=${klSym}&interval=1h&limit=50`
+      `https://api.binance.com/api/v3/klines?symbol=${klSym}&interval=1h&limit=50`,
+      { timeout: 10000 }
     );
     const h1Data = h1Response.data;
 
     // Fetch 4H data (last 30 candles)
     const h4Response = await axios.get(
-      `https://api.binance.com/api/v3/klines?symbol=${klSym}&interval=4h&limit=30`
+      `https://api.binance.com/api/v3/klines?symbol=${klSym}&interval=4h&limit=30`,
+      { timeout: 10000 }
     );
     const h4Data = h4Response.data;
 
@@ -48,8 +50,15 @@ export default async function handler(
       trend: getTrendLabel(combinedBias)
     });
   } catch (error: any) {
-    console.error('Error calculating HTF bias:', error.message);
-    res.status(500).json({ error: 'Failed to calculate HTF bias' });
+    console.error('HTF Bias Error:', error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    res.status(500).json({ 
+      error: 'Failed to calculate HTF bias',
+      details: error.message
+    });
   }
 }
 
