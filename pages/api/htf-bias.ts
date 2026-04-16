@@ -73,7 +73,7 @@ export default async function handler(
 }
 
 function generateMockKlines(count: number, basePrice: number): any[] {
-  const klines = [];
+  const klines: any[] = [];
   let price = basePrice;
   const now = Date.now();
   
