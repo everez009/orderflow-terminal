@@ -404,7 +404,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
       <button class="tfb"    onclick="switchTF(60)" id="tf-60">1H</button>
     </div>
     <div class="sep"></div>
-    <button class="ibtn" id="sndBtn" onclick="toggleSound()">🔊 OFF</button>
+    <button class="ibtn on" id="sndBtn" onclick="toggleSound()">🔊 ON</button>
     <button class="ibtn on" id="vpBtn" onclick="toggleVP()">VP ON</button>
     <button class="ibtn amb" id="hmBtn" onclick="cycleView()">FOOTPRINT</button>
     <button class="ibtn" onclick="cycleFontSize()">Aa</button>
@@ -682,7 +682,10 @@ const TRADING_MODES = {
     optionalRequired: 1,     // Need at least 1 optional condition (vs 2)
     starThreshold: 0.2,      // Show 2+ stars at 20% optional pass rate
     alertStars: 0.2,         // Alert on 20%+ (1★+)
-    color: '#ffa500'
+    color: '#ffa500',
+    // Optimal SL/TP settings for scalping
+    stopLossPct: 0.004,      // 0.4% SL
+    takeProfitPct: 0.008     // 0.8% TP (2:1 R:R)
   },
   day: {
     name: 'Day Trading',
@@ -691,7 +694,10 @@ const TRADING_MODES = {
     optionalRequired: 2,     // Need at least 2 optional conditions
     starThreshold: 0.4,      // Show 2+ stars at 40% optional pass rate
     alertStars: 0.4,         // Alert on 40%+ (2★+)
-    color: '#00ff88'
+    color: '#00ff88',
+    // Optimal SL/TP settings for day trading
+    stopLossPct: 0.01,       // 1.0% SL
+    takeProfitPct: 0.02      // 2.0% TP (2:1 R:R)
   },
   swing: {
     name: 'Swing Trading',
@@ -700,7 +706,10 @@ const TRADING_MODES = {
     optionalRequired: 3,     // Need at least 3 optional conditions
     starThreshold: 0.6,      // Show 2+ stars at 60% optional pass rate
     alertStars: 0.6,         // Alert on 60%+ (3★+)
-    color: '#8a2be2'
+    color: '#8a2be2',
+    // Optimal SL/TP settings for swing trading
+    stopLossPct: 0.025,      // 2.5% SL
+    takeProfitPct: 0.05      // 5.0% TP (2:1 R:R)
   }
 };
 
@@ -713,7 +722,8 @@ let ws=null;
 
 // Sound system
 let audioCtx = null;
-let soundOn=false;
+let soundOn=true;
+let lastVoiceAlert = 0; // Reset voice cooldown
 
 // Footprint pan/zoom
 let fpOffset=0, fpZoom=12; // fpZoom = candle width px
@@ -754,7 +764,7 @@ let htfBiasData = { h1: 0, h4: 0, daily: 0 }; // HTF bias scores (-100 to +100)
 let htfInterval = null; // Interval for periodic HTF updates
 
 // Signal markers for chart
-const signalMarkers = [];
+let signalMarkers = [];
 let signalSeries = null;
 
 // Load journal from localStorage on startup
@@ -1126,19 +1136,18 @@ function addTradeToJournal(signal) {
     }
   });
   
+  // Calculate SL/TP based on trading mode (optimal settings)
+  const modeConfig = TRADING_MODES[activeMode];
   let stopLoss, takeProfit;
+  
   if (signal.direction === 'sell') {
     // SELL: Stop above, target below
-    const stopDistance = nearestResistance ? (nearestResistance - currentPrice) : currentPrice * 0.005;
-    const targetDistance = nearestSupport ? (currentPrice - nearestSupport) : currentPrice * 0.01;
-    stopLoss = currentPrice + stopDistance;
-    takeProfit = currentPrice - targetDistance;
+    stopLoss = signal.price * (1 + modeConfig.stopLossPct);
+    takeProfit = signal.price * (1 - modeConfig.takeProfitPct);
   } else {
     // BUY: Stop below, target above
-    const stopDistance = nearestSupport ? (currentPrice - nearestSupport) : currentPrice * 0.005;
-    const targetDistance = nearestResistance ? (nearestResistance - currentPrice) : currentPrice * 0.01;
-    stopLoss = currentPrice - stopDistance;
-    takeProfit = currentPrice + targetDistance;
+    stopLoss = signal.price * (1 - modeConfig.stopLossPct);
+    takeProfit = signal.price * (1 + modeConfig.takeProfitPct);
   }
   
   const trade = {
@@ -1190,6 +1199,7 @@ function closeTrade(tradeId, exitPrice, exitReason = 'manual') {
   // Play alert sound for TP/SL hits
   if (exitReason === 'tp_hit' || exitReason === 'sl_hit') {
     playAlertSound('signal', 'high');
+    playVoiceAlert('tp_sl', trade.type, exitPrice, '');
   }
 }
 
@@ -1364,8 +1374,9 @@ function renderJournal() {
 
 // Update performance statistics
 function updateStats() {
-  const closedTrades = tradeJournal.filter(t => t.status === 'closed');
+  // Include ALL trades (open and closed) for total count
   const totalTrades = tradeJournal.length;
+  const closedTrades = tradeJournal.filter(t => t.status === 'closed' || t.status === 'tp_hit' || t.status === 'sl_hit');
   
   if (closedTrades.length === 0) {
     document.getElementById('totalTrades').textContent = totalTrades;
@@ -1715,8 +1726,10 @@ function addSignalMarker(signal) {
     tp = direction === 'buy' ? price * 1.01 : price * 0.99;
   }
   
-  // Create marker
-  const timestamp = Math.floor(Date.now() / 1000);
+  // Create marker aligned with current candlestick bar
+  const tfSec = activeTF * 60;
+  const timestamp = Math.floor(Date.now() / 1000 / tfSec) * tfSec;
+  
   const marker = {
     time: timestamp,
     position: direction === 'buy' ? 'belowBar' : 'aboveBar',
@@ -1734,7 +1747,67 @@ function addSignalMarker(signal) {
   // Draw SL and TP lines
   drawSignalLevels(price, sl, tp, direction);
   
-  console.log(`✅ Signal marker added: ${stars} ${direction.toUpperCase()} @ $${price.toFixed(cfg.dec)}`);
+  console.log(`✅ Signal marker added: ${stars} ${direction.toUpperCase()} @ $${price.toFixed(cfg.dec)} (time: ${timestamp})`);
+}
+
+// Add price lines for key levels with 3-star strength
+function addKeyLevelMarkers(classified) {
+  console.log(`🔍 addKeyLevelMarkers called with ${classified?.length || 0} levels`);
+  if (!classified || !classified.length) return;
+  if (!cs || typeof cs.createPriceLine !== 'function') {
+    console.warn('cs not ready for key level lines');
+    return;
+  }
+  
+  try {
+    const cfg = SYMS[activeSym];
+    
+    // Find 3-star key levels
+    const threeStarLevels = classified.filter(lv => lv.strength > 0.7);
+    
+    console.log(`📊 Filtered to ${threeStarLevels.length} 3-star levels (>0.7 strength)`);
+    
+    if (!threeStarLevels.length) {
+      console.log(`No 3-star key levels (found ${classified.length} levels, strongest: ${Math.max(...classified.map(l=>l.strength)).toFixed(2)})`);
+      return;
+    }
+    
+    // Remove old key level lines
+    if (window.keyLevelLines) {
+      window.keyLevelLines.forEach(line => {
+        try { cs.removePriceLine(line); } catch(e) {}
+      });
+    }
+    window.keyLevelLines = [];
+    
+    // Add price line for each 3-star key level
+    for (const lv of threeStarLevels) {
+      const isSupport = lv.type === 'sup' || lv.type === 'ob-bull';
+      
+      // Make lines translucent for better chart visibility
+      const color = isSupport ? 'rgba(0,255,136,0.6)' : 'rgba(255,51,85,0.6)';
+      const lineWidth = 2;
+      const lineStyle = LightweightCharts.LineStyle.Dashed;
+      
+      console.log(`📌 Creating line: ${lv.label} @ $${lv.price.toFixed(cfg.dec)} (strength: ${lv.strength.toFixed(2)}, support: ${isSupport})`);
+      
+      const line = cs.createPriceLine({
+        price: lv.price,
+        color: color,
+        lineWidth: lineWidth,
+        lineStyle: lineStyle,
+        axisLabelVisible: true,
+        title: `${isSupport ? 'S' : 'R'} ${lv.label} $${lv.price.toFixed(cfg.dec)}`
+      });
+      
+      window.keyLevelLines.push(line);
+    }
+    
+    console.log(`✅ Key level lines added: ${threeStarLevels.length} 3-star levels at prices: ${threeStarLevels.map(l=>'$'+l.price.toFixed(0)).join(', ')}`);
+  } catch (e) {
+    console.error('Key level lines error:', e);
+    // Don't break key levels display - just skip markers
+  }
 }
 
 function drawSignalLevels(entry, sl, tp, direction) {
@@ -1751,34 +1824,34 @@ function drawSignalLevels(entry, sl, tp, direction) {
   
   const cfg = SYMS[activeSym];
   
-  // Entry line
+  // Entry line (amber, translucent)
   window.entryLine = cs.createPriceLine({
     price: entry,
-    color: '#ffaa00',
+    color: 'rgba(255,170,0,0.5)',
     lineWidth: 1,
-    lineStyle: LightweightCharts.LineStyle.Solid,
-    axisLabelVisible: true,
-    title: `ENTRY $${entry.toFixed(cfg.dec)}`
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible: false,
+    title: ``
   });
   
-  // Stop Loss line
+  // Stop Loss line (red, translucent)
   window.slLine = cs.createPriceLine({
     price: sl,
-    color: '#ff3355',
-    lineWidth: 2,
+    color: 'rgba(255,51,85,0.4)',
+    lineWidth: 1,
     lineStyle: LightweightCharts.LineStyle.Dashed,
-    axisLabelVisible: true,
-    title: `SL $${sl.toFixed(cfg.dec)}`
+    axisLabelVisible: false,
+    title: ``
   });
   
-  // Take Profit line
+  // Take Profit line (green, translucent)
   window.tpLine = cs.createPriceLine({
     price: tp,
-    color: '#00ff88',
-    lineWidth: 2,
+    color: 'rgba(0,255,136,0.4)',
+    lineWidth: 1,
     lineStyle: LightweightCharts.LineStyle.Dashed,
-    axisLabelVisible: true,
-    title: `TP $${tp.toFixed(cfg.dec)}`
+    axisLabelVisible: false,
+    title: ``
   });
 }
 
@@ -1812,7 +1885,8 @@ async function fetchHistory(sym,tf){
     }catch(e){
       setLoad(false,'',0);
       document.getElementById('chartLbl').textContent='LOAD FAILED — LIVE ONLY';
-      console.warn('klines fetch failed:',e);
+      console.error('❌ klines fetch failed:', e.message, e.stack);
+      alert('Failed to load candle data from Binance API. Check console for details.');
       return;
     }
   }
@@ -2419,6 +2493,107 @@ function playAlertSound(type = 'whale', urgency = 'normal') {
     }
   } catch(e) {
     console.error('Sound playback error:', e);
+  }
+}
+
+// Voice alert using speech synthesis
+let voiceAlertOn = true;
+// lastVoiceAlert already declared at line 717
+
+function playVoiceAlert(type, direction, price, stars) {
+  console.log(`🔊 playVoiceAlert called: type=${type}, dir=${direction}, price=${price}, soundOn=${soundOn}, voiceAlertOn=${voiceAlertOn}`);
+  
+  // Initialize audio context on first user interaction
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      console.log('🔊 AudioContext initialized');
+    } catch(e) {
+      console.warn('🔊 AudioContext init failed:', e);
+    }
+  }
+  
+  if (!voiceAlertOn || !soundOn) {
+    console.warn(`🔊 Voice blocked: voiceAlertOn=${voiceAlertOn}, soundOn=${soundOn}`);
+    return;
+  }
+  
+  // Cooldown: only one voice alert per 8 seconds
+  const now = Date.now();
+  if (now - lastVoiceAlert < 8000) {
+    console.log(`🔊 Voice cooldown active (${now - lastVoiceAlert}ms since last)`);
+    return;
+  }
+  lastVoiceAlert = now;
+  
+  try {
+    const symLabel = SYMS[activeSym]?.label || activeSym;
+    let text = '';
+    
+    if (type === 'signal') {
+      text = `${direction === 'buy' ? 'Buy' : 'Sell'} signal ${stars} on ${symLabel}. Price ${price.toFixed(2)}`;
+    } else if (type === 'whale') {
+      text = `Whale alert! ${direction === 'buy' ? 'Buy' : 'Sell'} on ${symLabel}. Price ${price.toFixed(2)}`;
+    } else if (type === 'institutional') {
+      text = `Institutional order. ${direction === 'buy' ? 'Buy' : 'Sell'} on ${symLabel}. Price ${price.toFixed(2)}`;
+    } else if (type === 'tp_sl') {
+      text = `${direction === 'buy' ? 'Buy' : 'Sell'} position closed`;
+    }
+    
+    if (text) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      
+      utterance.onstart = () => console.log('🔊 Speaking:', text);
+      utterance.onerror = (e) => console.error('🔊 Speech error:', e);
+      utterance.onend = () => console.log('🔊 Speech finished');
+      
+      window.speechSynthesis.speak(utterance);
+      console.log(`🔊 Voice alert queued: ${text}`);
+    }
+  } catch(e) {
+    console.warn('Voice alert error:', e);
+  }
+}
+
+// ═══════════════════════════════════════════
+// WHALE/INSTITUTIONAL NOTIFICATIONS
+// Handles voice, Telegram, WhatsApp for large trades
+// ═══════════════════════════════════════════
+function fireNotifs(al){
+  const {sym,type,p,q,usd,isW,emoji,note}=al;
+  const cfg=SYMS[sym];
+  const c=getCfg();
+  const direction=isW||type.includes('BUY')?'buy':'sell';
+  
+  console.log(`📢 fireNotifs called for ${emoji} ${type}`);
+  
+  // Voice alert
+  if(soundOn && voiceAlertOn){
+    const alertType = isW ? 'whale' : 'institutional';
+    playVoiceAlert(alertType, direction, p, '');
+  }
+  
+  // Telegram notification
+  if(c.tgTok&&c.tgCid){
+    const msg=`${emoji} *${type}*\n${cfg.label}\n💰 $${usd.toLocaleString()} @ $${p.toFixed(cfg.dec)}\n📊 Qty: ${q.toFixed(4)}\n📝 ${note}\n⏰ ${new Date().toUTCString().slice(17,25)} UTC`;
+    fetch(`https://api.telegram.org/bot${c.tgTok}/sendMessage`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:c.tgCid,text:msg,parse_mode:'Markdown'})
+    }).then(r=>r.json()).then(d=>{
+      console.log(`📱 Telegram sent: ${d.ok ? '✅' : '❌'}`);
+    }).catch(e=>console.error('Telegram error:',e));
+  }
+  
+  // WhatsApp via CallMeBot
+  if(c.waNr&&c.waKey){
+    const waMsg=`${emoji} ${type} - ${cfg.label} - $${usd.toLocaleString()} @ $${p.toFixed(cfg.dec)} - ${note}`;
+    sendWA(waMsg,c);
   }
 }
 
@@ -3980,27 +4155,46 @@ function renderSignalValidation() {
 
 // ── SIGNAL NOTIFICATIONS ──────────────────────────────────────
 function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
-  // Add to trade journal automatically
-  const activeConds = dir === 'buy' ? 
-    [{label:'AT SUPPORT', pass:true}, {label:'VP BIAS BUY', pass:true}, {label:'POC ABOVE', pass:true}, 
-     {label:'FP DELTA +', pass:true}, {label:'CUMUL Δ +', pass:true}, {label:'BID WALL', pass:true}, {label:'WHALE BUY', pass:true}] :
-    [{label:'AT RESISTANCE', pass:true}, {label:'VP BIAS SELL', pass:true}, {label:'POC BELOW', pass:true}, 
-     {label:'FP DELTA -', pass:true}, {label:'CUMUL Δ -', pass:true}, {label:'ASK WALL', pass:true}, {label:'WHALE SELL', pass:true}];
+  // Calculate star count first
+  const starCount = stars.split('★').length - 1;
   
-  addTradeToJournal({
-    direction: dir,
-    price: price,
-    stars: stars,
-    conditions: activeConds
-  });
+  // Only journal 3+ star signals
+  if (starCount >= 3) {
+    // Add to trade journal automatically
+    const activeConds = dir === 'buy' ? 
+      [{label:'AT SUPPORT', pass:true}, {label:'VP BIAS BUY', pass:true}, {label:'POC ABOVE', pass:true}, 
+       {label:'FP DELTA +', pass:true}, {label:'CUMUL Δ +', pass:true}, {label:'BID WALL', pass:true}, {label:'WHALE BUY', pass:true}] :
+      [{label:'AT RESISTANCE', pass:true}, {label:'VP BIAS SELL', pass:true}, {label:'POC BELOW', pass:true}, 
+       {label:'FP DELTA -', pass:true}, {label:'CUMUL Δ -', pass:true}, {label:'ASK WALL', pass:true}, {label:'WHALE SELL', pass:true}];
+    
+    addTradeToJournal({
+      direction: dir,
+      price: price,
+      stars: stars,
+      conditions: activeConds
+    });
+  } else {
+    console.log(`📓 Skipping journal: only ${starCount} stars (need 3+)`);
+  }
+  console.log(`🔊 Signal received: ${dir} @ ${price}, stars="${stars}", starCount=${starCount}`);
   
   // Play alert sound
   if(soundOn){
     playAlertSound('signal', score >= 4 ? 'high' : 'normal');
+        
+    // Voice alert for signals (3+ stars only)
+    console.log(`🔊 Checking voice: starCount=${starCount} >= 3? ${starCount >= 3}`);
+    if (starCount >= 3) {
+      console.log(`🔊 Triggering voice alert...`);
+      playVoiceAlert('signal', dir, price, stars);
+    } else {
+      console.log(`🔊 Skipping voice: only ${starCount} stars (need 3+)`);
+    }
   }
   
-  // Add marker to chart for 3+ star signals
-  const starCount = stars.split('★').length - 1;
+  // REMOVED: Chart markers with text labels clutter the chart
+  // Using horizontal price lines only for cleaner visualization
+  /*
   if (starCount >= 3) {
     addSignalMarker({
       direction: dir,
@@ -4008,6 +4202,57 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
       stars: stars,
       score: score
     });
+  }
+  */
+  
+  // Add EP, TP, SL as horizontal price lines on chart
+  if (starCount >= 3) {
+    const modeConfig = TRADING_MODES[activeMode];
+    const tp = dir === 'buy' ? price * (1 + modeConfig.takeProfitPct) : price * (1 - modeConfig.takeProfitPct);
+    const sl = dir === 'buy' ? price * (1 - modeConfig.stopLossPct) : price * (1 + modeConfig.stopLossPct);
+    
+    // Remove old signal lines if they exist
+    if (window.signalLines) {
+      window.signalLines.forEach(line => {
+        try { cs.removePriceLine(line); } catch(e) {}
+      });
+    }
+    window.signalLines = [];
+    
+    // Entry Price line
+    const epLine = cs.createPriceLine({
+      price: price,
+      color: '#ffa500',
+      lineWidth: 2,
+      lineStyle: 2, // dashed
+      axisLabelVisible: true,
+      title: `EP $${price.toFixed(cfg.dec)}`
+    });
+    window.signalLines.push(epLine);
+    
+    // Take Profit line
+    const tpLine = cs.createPriceLine({
+      price: tp,
+      color: '#00ff88',
+      lineWidth: 2,
+      lineStyle: 2, // dashed
+      axisLabelVisible: true,
+      title: `TP $${tp.toFixed(cfg.dec)}`
+    });
+    window.signalLines.push(tpLine);
+    
+    // Stop Loss line
+    const slLine = cs.createPriceLine({
+      price: sl,
+      color: '#ff3355',
+      lineWidth: 2,
+      lineStyle: 2, // dashed
+      axisLabelVisible: true,
+      title: `SL $${sl.toFixed(cfg.dec)}`
+    });
+    window.signalLines.push(slLine);
+    
+    console.log(`📊 Added EP/TP/SL lines: EP=${price.toFixed(2)}, TP=${tp.toFixed(2)}, SL=${sl.toFixed(2)}`);
   }
 
   // Toast notification
@@ -4052,12 +4297,16 @@ function showToast(dir,price,stars,levelLabel,cfg){
 // BEAR ORDER BLOCK: Last bullish candle before a strong bearish move (price ran down from there)
 // Levels that have been tested multiple times but held = stronger
 function renderHiLiq(){
+  console.log('🔍 renderHiLiq called');
   const s=ST[activeSym],cfg=SYMS[activeSym];
   const vp=s.vp, vpKeys=Object.keys(vp);
   const lastPrice=s.last||0;
 
+  console.log(`📊 VP keys: ${vpKeys.length}, lastPrice: ${lastPrice}`);
+
   if(!vpKeys.length||!lastPrice){
     document.getElementById('hiLiqPanel').innerHTML='<div class="nd">AWAITING DATA<br><span class="blk">▌</span></div>';
+    console.warn('⚠️ No VP data or price yet');
     return;
   }
 
@@ -4162,6 +4411,9 @@ function renderHiLiq(){
     return;
   }
 
+  // Add key level markers for 3-star levels
+  addKeyLevelMarkers(classified);
+
   // ── Render ────────────────────────────────────────
   let html=`<div style="display:grid;grid-template-columns:58px 1fr 40px 50px;gap:0;padding:3px 8px 3px;background:var(--bg3);font-size:.64em;color:var(--dim);border-bottom:1px solid var(--border);letter-spacing:1px;">
     <div>PRICE</div><div>TYPE · NOTE</div><div style="text-align:center">DIST</div><div style="text-align:right">STRENGTH</div>
@@ -4183,7 +4435,7 @@ function renderHiLiq(){
 
     html+=`<div class="liq-row ${lv.type}" style="background:${rowBg}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-        <span style="font-family:var(--disp);font-size:.75em;color:${priceCol};font-weight:bold">${lv.price.toFixed(cfg.dec)}</span>
+        <span style="font-family:var(--disp);font-size:.75em;color:${priceCol};font-weight:bold">$${lv.price.toFixed(cfg.dec)}</span>
         <span class="liq-tag" style="${lv.tagStyle}">${lv.label}</span>
         <span style="font-size:.7em;color:var(--dim)">${abv?'▲':'▼'} ${lv.distPct.toFixed(2)}%</span>
         <span style="font-size:.75em;color:${starsCol}">${stars}</span>
@@ -4192,13 +4444,15 @@ function renderHiLiq(){
         <div style="width:${buyW}px;background:rgba(0,220,80,.65);border-radius:1px 0 0 1px;min-width:1px"></div>
         <div style="width:${sellW}px;background:rgba(220,40,60,.65);border-radius:0 1px 1px 0;min-width:1px"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:.7em;color:var(--dim)">
-        <span>${lv.desc}</span>
-        <span style="color:var(--gdim)">B:${(lv.buyRatio*100).toFixed(0)}%</span>
-        <span style="color:var(--rdim)">S:${((1-lv.buyRatio)*100).toFixed(0)}%</span>
+      <div style="display:flex;justify-content:space-between;font-size:.7em;color:var(--dim);margin-top:2px;padding:2px 0;border-top:1px solid rgba(255,255,255,0.05)">
+        ${(lv.type==='res'||lv.type==='ob-bear') 
+          ? `<span style="color:#ff3355;font-weight:bold">Sell: ${((1-lv.buyRatio)*100).toFixed(0)}%</span>` 
+          : `<span style="color:#00ff88;font-weight:bold">Buy: ${(lv.buyRatio*100).toFixed(0)}%</span>`}
       </div>
     </div>`;
   }
+  
+  console.log(`✅ renderHiLiq complete: rendered ${classified.length} levels`);
 
   // ── Summary: nearest support below + nearest resistance above ──
   // Filter strictly by position relative to current price, then find closest
@@ -4675,6 +4929,10 @@ function fireNotifs(a){
     const type = a.isW ? 'whale' : 'institutional';
     const urgency = a.usd >= SYMS[a.sym].whaleUSD * 3 ? 'high' : 'normal';
     playAlertSound(type, urgency);
+    
+    // Voice alert for significant orders
+    const dir = a.sell ? 'sell' : 'buy';
+    playVoiceAlert(type, dir, a.p, '');
   }
   
   const c=getCfg();
@@ -5020,6 +5278,19 @@ async function boot(){
     localStorage.setItem('orderflow_session_start', vpSessionStart);
   }
   
+  // Sync sound button UI with soundOn state
+  const sndBtn = document.getElementById('sndBtn');
+  if (sndBtn) {
+    if (soundOn) {
+      sndBtn.textContent = '🔊 ON';
+      sndBtn.classList.add('on');
+    } else {
+      sndBtn.textContent = '🔊 OFF';
+      sndBtn.classList.remove('on');
+    }
+  }
+  console.log(`🔊 Sound initialized: ${soundOn ? 'ON' : 'OFF'}`);
+  
   // Verify notification settings persistence
   const notifCfg = getCfg();
   console.log('🔔 Notification Settings Check:');
@@ -5052,16 +5323,27 @@ async function boot(){
 
   // Prefetch both symbols in parallel — tab switching is then instant
   const syms=Object.keys(SYMS);
-  await Promise.all(syms.map(sym=>{
-    const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${TF_KLINE[activeTF]}&limit=300`;
-    return fetch(url).then(r=>r.json()).then(data=>{
-      klCache[sym+'_'+activeTF]={data,ts:Date.now()};
-      console.log(`✅ Cached ${data.length} candles for ${sym}`);
-    }).catch(()=>{});
-  }));
+  try {
+    await Promise.all(syms.map(sym=>{
+      const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${TF_KLINE[activeTF]}&limit=300`;
+      return fetch(url).then(r=>r.json()).then(data=>{
+        klCache[sym+'_'+activeTF]={data,ts:Date.now()};
+        console.log(`✅ Cached ${data.length} candles for ${sym}`);
+      }).catch(err=>{
+        console.error(`❌ Failed to cache ${sym}:`, err.message);
+      });
+    }));
+  } catch(e) {
+    console.error('❌ Error prefetching candles:', e);
+  }
 
   // Load active symbol from cache — no extra network call
-  await fetchHistory(activeSym,activeTF);
+  try {
+    await fetchHistory(activeSym,activeTF);
+    console.log('✅ History loaded successfully');
+  } catch(e) {
+    console.error('❌ Error loading history:', e);
+  }
   
   console.log('📊 Volume Profile initialized with', Object.keys(ST[activeSym].vp).length, 'levels');
 
