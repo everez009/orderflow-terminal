@@ -706,9 +706,13 @@ const TRADING_MODES = {
 let activeMode = 'day'; // Default to day trading mode
 
 let activeSym='PAXGUSDT', activeTF=15;
-let soundOn=false, vpOn=true;
+let vpOn=true;
 let viewMode=0; // 0=candlestick, 1=footprint, 2=heatmap
 let ws=null;
+
+// Sound system
+let audioCtx = null;
+let soundOn=false;
 
 // Footprint pan/zoom
 let fpOffset=0, fpZoom=12; // fpZoom = candle width px
@@ -746,6 +750,11 @@ let wakeLock = null; // Prevent screen sleep on mobile
 // HTF Bias Configuration
 let htfBiasEnabled = false; // Toggle for HTF bias filtering
 let htfBiasData = { h1: 0, h4: 0, daily: 0 }; // HTF bias scores (-100 to +100)
+let htfInterval = null; // Interval for periodic HTF updates
+
+// Signal markers for chart
+const signalMarkers = [];
+let signalSeries = null;
 
 // Load journal from localStorage on startup
 function loadJournal() {
@@ -998,6 +1007,15 @@ async function calculateHTFBias() {
     
     console.log(`📊 HTF Bias: 1H=${h1Bias.toFixed(1)}, 4H=${h4Bias.toFixed(1)}, Combined=${combinedBias.toFixed(1)}`);
     
+    // Update button display if enabled
+    if (htfBiasEnabled) {
+      const btn = document.getElementById('htfBiasBtn');
+      if (btn) {
+        const biasDirection = combinedBias > 20 ? '🟢 BULL' : combinedBias < -20 ? '🔴 BEAR' : '⚪ NEUT';
+        btn.textContent = `📊 HTF ${biasDirection}`;
+      }
+    }
+    
     return combinedBias;
   } catch(e) {
     console.error('Failed to calculate HTF bias:', e);
@@ -1027,16 +1045,46 @@ function toggleHTFBias() {
   const btn = document.getElementById('htfBiasBtn');
   
   if (htfBiasEnabled) {
-    btn.textContent = '📊 HTF ON';
+    btn.textContent = '📊 HTF CALC...';
     btn.classList.add('on');
     console.log('✅ HTF Bias filtering ENABLED');
-    // Calculate initial bias
-    calculateHTFBias();
+    
+    // Calculate initial bias immediately
+    calculateHTFBias().then(bias => {
+      const biasDirection = bias > 20 ? '🟢 BULL' : bias < -20 ? '🔴 BEAR' : '⚪ NEUT';
+      btn.textContent = `📊 HTF ${biasDirection}`;
+    });
+    
+    // Set up periodic updates
+    if (!htfInterval) {
+      htfInterval = setInterval(calculateHTFBias, 60000);
+    }
   } else {
     btn.textContent = '📊 HTF OFF';
     btn.classList.remove('on');
     console.log('⏸️ HTF Bias filtering DISABLED');
+    
+    // Clear interval
+    if (htfInterval) {
+      clearInterval(htfInterval);
+      htfInterval = null;
+    }
   }
+}
+
+// Check if signal aligns with HTF bias
+function checkHTFFilter(direction, htfBias) {
+  if (!htfBiasEnabled) return true; // No filter if disabled
+  
+  // Strong bias (>50): only allow signals in that direction
+  if (htfBias > 50 && direction === 'sell') return false;
+  if (htfBias < -50 && direction === 'buy') return false;
+  
+  // Moderate bias (20-50): reduce score for counter-trend signals
+  if (htfBias > 20 && direction === 'sell') return 'reduce';
+  if (htfBias < -20 && direction === 'buy') return 'reduce';
+  
+  return true; // Neutral or aligned
 }
 
 // Save journal to localStorage
@@ -1137,6 +1185,39 @@ function closeTrade(tradeId, exitPrice, exitReason = 'manual') {
   saveJournal();
   renderJournal();
   updateStats();
+  
+  // Play alert sound for TP/SL hits
+  if (exitReason === 'tp_hit' || exitReason === 'sl_hit') {
+    playAlertSound('signal', 'high');
+  }
+}
+
+// Auto-close trades when TP/SL hit
+function checkOpenTrades(currentPrice) {
+  tradeJournal.forEach(trade => {
+    if (trade.status !== 'open') return;
+    
+    const cfg = SYMS[trade.symbol];
+    if (!cfg) return;
+    
+    // Check TP
+    if (trade.takeProfit) {
+      if ((trade.type === 'buy' && currentPrice >= trade.takeProfit) ||
+          (trade.type === 'sell' && currentPrice <= trade.takeProfit)) {
+        closeTrade(trade.id, trade.takeProfit, 'tp_hit');
+        console.log(`✅ TP HIT: ${trade.type.toUpperCase()} ${trade.symbol} @ $${currentPrice.toFixed(cfg.dec)} | P&L: $${trade.profitLoss?.toFixed(2)}`);
+      }
+    }
+    
+    // Check SL
+    if (trade.stopLoss) {
+      if ((trade.type === 'buy' && currentPrice <= trade.stopLoss) ||
+          (trade.type === 'sell' && currentPrice >= trade.stopLoss)) {
+        closeTrade(trade.id, trade.stopLoss, 'sl_hit');
+        console.log(`❌ SL HIT: ${trade.type.toUpperCase()} ${trade.symbol} @ $${currentPrice.toFixed(cfg.dec)} | P&L: $${trade.profitLoss?.toFixed(2)}`);
+      }
+    }
+  });
 }
 
 // Manual close helpers for journal buttons
@@ -1590,6 +1671,117 @@ function drawVPC(){
 lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{drawVPC();});
 
 // ═══════════════════════════════════════════
+// SIGNAL MARKERS ON CHART
+// Add visual markers for 3+ star signals with Entry/SL/TP
+// ═══════════════════════════════════════════
+function initSignalMarkers() {
+  if (!signalSeries) {
+    signalSeries = lwChart.addLineSeries({
+      color: '#ffaa00',
+      lineWidth: 0,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+  }
+}
+
+function addSignalMarker(signal) {
+  initSignalMarkers();
+  
+  const cfg = SYMS[activeSym];
+  const price = signal.price;
+  const direction = signal.direction;
+  const stars = signal.stars || '';
+  const starCount = stars.split('★').length - 1;
+  
+  // Only show 3+ star signals
+  if (starCount < 3) return;
+  
+  // Calculate SL and TP from risk calculator or defaults
+  let sl, tp;
+  const slDisplay = document.getElementById('stopLossDisplay');
+  const tpDisplay = document.getElementById('takeProfitDisplay');
+  
+  if (slDisplay && slDisplay.textContent !== '---') {
+    sl = parseFloat(slDisplay.textContent.replace('$', '').replace(',', ''));
+  } else {
+    sl = direction === 'buy' ? price * 0.995 : price * 1.005;
+  }
+  
+  if (tpDisplay && tpDisplay.textContent !== '---') {
+    tp = parseFloat(tpDisplay.textContent.replace('$', '').replace(',', ''));
+  } else {
+    tp = direction === 'buy' ? price * 1.01 : price * 0.99;
+  }
+  
+  // Create marker
+  const timestamp = Math.floor(Date.now() / 1000);
+  const marker = {
+    time: timestamp,
+    position: direction === 'buy' ? 'belowBar' : 'aboveBar',
+    color: direction === 'buy' ? '#00ff88' : '#ff3355',
+    shape: direction === 'buy' ? 'arrowUp' : 'arrowDown',
+    text: `${stars} ${direction.toUpperCase()}\nE:$${price.toFixed(cfg.dec)}\nSL:$${sl.toFixed(cfg.dec)}\nTP:$${tp.toFixed(cfg.dec)}`,
+    size: starCount >= 4 ? 2 : 1
+  };
+  
+  signalMarkers.push(marker);
+  
+  // Update chart markers
+  cs.setMarkers(signalMarkers);
+  
+  // Draw SL and TP lines
+  drawSignalLevels(price, sl, tp, direction);
+  
+  console.log(`✅ Signal marker added: ${stars} ${direction.toUpperCase()} @ $${price.toFixed(cfg.dec)}`);
+}
+
+function drawSignalLevels(entry, sl, tp, direction) {
+  // Remove old signal lines if any
+  if (window.entryLine) {
+    try { cs.removePriceLine(window.entryLine); } catch(e) {}
+  }
+  if (window.slLine) {
+    try { cs.removePriceLine(window.slLine); } catch(e) {}
+  }
+  if (window.tpLine) {
+    try { cs.removePriceLine(window.tpLine); } catch(e) {}
+  }
+  
+  const cfg = SYMS[activeSym];
+  
+  // Entry line
+  window.entryLine = cs.createPriceLine({
+    price: entry,
+    color: '#ffaa00',
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Solid,
+    axisLabelVisible: true,
+    title: `ENTRY $${entry.toFixed(cfg.dec)}`
+  });
+  
+  // Stop Loss line
+  window.slLine = cs.createPriceLine({
+    price: sl,
+    color: '#ff3355',
+    lineWidth: 2,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: `SL $${sl.toFixed(cfg.dec)}`
+  });
+  
+  // Take Profit line
+  window.tpLine = cs.createPriceLine({
+    price: tp,
+    color: '#00ff88',
+    lineWidth: 2,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: `TP $${tp.toFixed(cfg.dec)}`
+  });
+}
+
+// ═══════════════════════════════════════════
 // FETCH HISTORICAL KLINES FROM BINANCE REST
 // ═══════════════════════════════════════════
 // ── KLINE CACHE — no re-fetch within 60 seconds ──────────────
@@ -1742,6 +1934,11 @@ function onTrade(sym,d){
 
   s.last=p;s.n++;s.vol+=usd;
   s.delta+=sell?-q:q;
+  
+  // Check open trades for TP/SL hits
+  if (sym === activeSym) {
+    checkOpenTrades(p);
+  }
 
   // VP — use dynamic bucket, track visit count per level
   const dynBkt=cfg.dynBucket||cfg.bucket;
@@ -2126,8 +2323,102 @@ function cycleFontSize(){
 function toggleSound(){
   soundOn=!soundOn;
   const b=document.getElementById('sndBtn');
-  b.textContent='🔊 '+(soundOn?'ON':'OFF');
-  b.className='ibtn'+(soundOn?' on':'');
+  
+  if (soundOn) {
+    initAudio();
+    b.textContent = '🔊 ON';
+    b.classList.add('on');
+    // Test sound
+    setTimeout(() => playAlertSound('signal', 'normal'), 100);
+  } else {
+    b.textContent = '🔊 OFF';
+    b.classList.remove('on');
+  }
+}
+
+// ═══════════════════════════════════════════
+// SOUND SYSTEM - REFACTORED
+// Proper audio beeps instead of speech synthesis
+// ═══════════════════════════════════════════
+function initAudio() {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  } catch(e) {
+    console.error('Audio initialization failed:', e);
+  }
+}
+
+function playAlertSound(type = 'whale', urgency = 'normal') {
+  if (!soundOn || !audioCtx) return;
+  
+  try {
+    const now = audioCtx.currentTime;
+    
+    // Different tones for different alert types
+    let frequency, duration, waveType;
+    
+    if (type === 'whale') {
+      frequency = urgency === 'high' ? 1200 : 800;
+      duration = urgency === 'high' ? 0.3 : 0.2;
+      waveType = 'sine';
+    } else if (type === 'institutional') {
+      frequency = urgency === 'high' ? 1000 : 600;
+      duration = urgency === 'high' ? 0.25 : 0.15;
+      waveType = 'triangle';
+    } else if (type === 'signal') {
+      frequency = 900;
+      duration = 0.15;
+      waveType = 'square';
+    } else {
+      frequency = 700;
+      duration = 0.1;
+      waveType = 'sine';
+    }
+    
+    // Create oscillator
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.frequency.value = frequency;
+    osc.type = waveType;
+    
+    // Envelope for smooth sound
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    osc.start(now);
+    osc.stop(now + duration);
+    
+    // Double beep for high urgency
+    if (urgency === 'high') {
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      
+      osc2.frequency.value = frequency * 1.2;
+      osc2.type = waveType;
+      
+      gain2.gain.setValueAtTime(0, now + 0.15);
+      gain2.gain.linearRampToValueAtTime(0.3, now + 0.16);
+      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.15 + duration);
+      
+      osc2.start(now + 0.15);
+      osc2.stop(now + 0.15 + duration);
+    }
+  } catch(e) {
+    console.error('Sound playback error:', e);
+  }
 }
 
 function toggleVP(){
@@ -3353,11 +3644,32 @@ function evalSignal(){
   let activeConds=null;
   let activeScore=null;
 
-  if(buySignal&&(!sellSignal||buyScore.score>=sellScore.score)){
+  // Apply HTF bias filter before determining signal direction
+  let filteredBuySignal = buySignal;
+  let filteredSellSignal = sellSignal;
+  
+  if (htfBiasEnabled) {
+    const htfCheck = checkHTFFilter('buy', htfBiasData.daily);
+    const htfCheckSell = checkHTFFilter('sell', htfBiasData.daily);
+    
+    if (htfCheck === false) {
+      filteredBuySignal = false;
+    } else if (htfCheck === 'reduce') {
+      buyScore.score = Math.max(0, buyScore.score - 1);
+    }
+    
+    if (htfCheckSell === false) {
+      filteredSellSignal = false;
+    } else if (htfCheckSell === 'reduce') {
+      sellScore.score = Math.max(0, sellScore.score - 1);
+    }
+  }
+
+  if(filteredBuySignal&&(!filteredSellSignal||buyScore.score>=sellScore.score)){
     direction='buy';
     activeConds=buyConditions;
     activeScore=buyScore;
-  } else if(sellSignal){
+  } else if(filteredSellSignal){
     direction='sell';
     activeConds=sellConditions;
     activeScore=sellScore;
@@ -3681,17 +3993,20 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
     conditions: activeConds
   });
   
-  // Get alert quality level
-  const quality = getAlertQuality({ stars: stars, conditions: activeConds });
+  // Play alert sound
+  if(soundOn){
+    playAlertSound('signal', score >= 4 ? 'high' : 'normal');
+  }
   
-  // Voice
-  if(soundOn || quality.sound){
-    const txt=dir==='buy'
-      ?`Buy signal on ${SYMS[activeSym]?.label||activeSym}. Price ${price.toFixed(cfg.dec)}. ${levelLabel}. Strength ${stars.length} star${stars.length>1?'s':''}.`
-      :`Sell signal on ${SYMS[activeSym]?.label||activeSym}. Price ${price.toFixed(cfg.dec)}. ${levelLabel}. Strength ${stars.length} star${stars.length>1?'s':''}.`;
-    const u=new SpeechSynthesisUtterance(txt);
-    u.rate=1.1; u.pitch=dir==='buy'?1.2:0.8; u.volume=1;
-    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  // Add marker to chart for 3+ star signals
+  const starCount = stars.split('★').length - 1;
+  if (starCount >= 3) {
+    addSignalMarker({
+      direction: dir,
+      price: price,
+      stars: stars,
+      score: score
+    });
   }
 
   // Toast notification
@@ -4355,8 +4670,10 @@ function fireNotifs(a){
   console.log(`📡 fireNotifs called for: ${a.type} | Sound: ${soundOn}, TG: ${getCfg().tgTok&&getCfg().tgCid ? 'YES' : 'NO'}, WA: ${getCfg().waNr&&getCfg().waKey ? 'YES' : 'NO'}`);
   
   if(soundOn) {
-    console.log('🔊 Attempting voice alert...');
-    speak(a);
+    console.log('🔊 Playing alert sound...');
+    const type = a.isW ? 'whale' : 'institutional';
+    const urgency = a.usd >= SYMS[a.sym].whaleUSD * 3 ? 'high' : 'normal';
+    playAlertSound(type, urgency);
   }
   
   const c=getCfg();
@@ -4685,6 +5002,7 @@ async function boot(){
   // Initialize trade management system
   loadJournal();
   updateRiskCalc();
+  updateStats(); // Ensure stats display on load
   
   // Load trading mode preference
   loadTradingMode();
