@@ -786,7 +786,8 @@ function mkS(){
       acceleration:0,       // Price change rate
       consecutiveGreen:0,   // Consecutive bullish candles
       buyPressure:0,        // Buy/sell ratio
-      earlyWarning:false    // Trigger flag
+      earlyWarning:false,   // Bullish trigger flag
+      bearishWarning:false  // Bearish trigger flag
     }
   };
 }
@@ -2470,6 +2471,7 @@ function onTrade(sym,d){
     // Early warning: strong bullish momentum
     if (rt.momentumScore > 60 && !rt.earlyWarning) {
       rt.earlyWarning = true;
+      rt.bearishWarning = false;
       console.log(`🚀🚀 BULLISH RUN DETECTED! Momentum: ${rt.momentumScore.toFixed(1)} | Accel: ${rt.acceleration.toFixed(3)}% | Buy Pressure: ${(rt.buyPressure*100).toFixed(1)}%`);
       
       // Fire run detection alert
@@ -2488,9 +2490,32 @@ function onTrade(sym,d){
       fireNotifs(runAlert);
     }
     
-    // Reset warning if momentum drops
-    if (rt.momentumScore < 30) {
+    // Early warning: strong bearish momentum
+    if (rt.momentumScore < -60 && !rt.bearishWarning) {
+      rt.bearishWarning = true;
       rt.earlyWarning = false;
+      console.log(`📉📉 BEARISH RUN DETECTED! Momentum: ${rt.momentumScore.toFixed(1)} | Accel: ${rt.acceleration.toFixed(3)}% | Sell Pressure: ${((1-rt.buyPressure)*50).toFixed(1)}%`);
+      
+      // Fire run detection alert
+      const runAlert = {
+        t: Date.now(),
+        sym,
+        type: '📉 BEARISH RUN STARTING',
+        p,
+        note: `Momentum ${rt.momentumScore.toFixed(0)} | Sell pressure ${((1-rt.buyPressure)*50).toFixed(0)}%`,
+        emoji: '📉',
+        momentum: rt.momentumScore
+      };
+      s.alerts.unshift(runAlert);
+      if (s.alerts.length > 200) s.alerts.pop();
+      if (sym === activeSym) addChip(runAlert);
+      fireNotifs(runAlert);
+    }
+    
+    // Reset warnings if momentum returns to neutral
+    if (rt.momentumScore > -30 && rt.momentumScore < 30) {
+      rt.earlyWarning = false;
+      rt.bearishWarning = false;
     }
   }
 
