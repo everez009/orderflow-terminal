@@ -14,7 +14,7 @@
   --white:#e8f0ff;--dim:#3a4a60;
   --wgold:#ffd700;--ipur:#cc88ff;
   --mono:'Share Tech Mono',monospace;--disp:'Orbitron',monospace;
-  --fs:14px; /* base font size — changed by cycleFontSize */
+  --fs:18px; /* base font size — changed by cycleFontSize */
 }
 /* Global font scale — ALL text inherits from body */
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -23,27 +23,27 @@ body{background:var(--bg);color:var(--white);font-family:var(--mono);font-size:v
 body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,.008) 2px,rgba(0,255,136,.008) 4px);pointer-events:none;z-index:9999;}
 
 /* HEADER */
-.hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;}
-.title{font-family:var(--disp);font-size:1.09em;font-weight:900;letter-spacing:4px;color:var(--green);text-shadow:0 0 16px rgba(0,255,136,.5);}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;}
+.title{font-family:var(--disp);font-size:1.3em;font-weight:900;letter-spacing:4px;color:var(--green);text-shadow:0 0 16px rgba(0,255,136,.5);}
 .hdr-r{display:flex;gap:14px;align-items:center;}
 .sdot{width:6px;height:6px;border-radius:50%;animation:pulse 1.5s infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.slbl{color:var(--dim);font-size:.82em;letter-spacing:2px;}
-.clk{font-family:var(--disp);font-size:.91em;color:var(--amber);letter-spacing:2px;}
+.slbl{color:var(--dim);font-size:.95em;letter-spacing:2px;}
+.clk{font-family:var(--disp);font-size:1.05em;color:var(--amber);letter-spacing:2px;}
 
 /* CONTROLS */
 .ctrl{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 14px;flex-shrink:0;}
 .stabs{display:flex;}
-.stab{padding:7px 16px;cursor:pointer;font-family:var(--disp);font-size:.82em;letter-spacing:2px;color:var(--dim);border-bottom:2px solid transparent;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none;}
+.stab{padding:7px 16px;cursor:pointer;font-family:var(--disp);font-size:.95em;letter-spacing:2px;color:var(--dim);border-bottom:2px solid transparent;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none;}
 .stab.on{color:var(--green);border-bottom-color:var(--green);}
 .stab:hover:not(.on){color:var(--white);}
 .cr{display:flex;gap:4px;align-items:center;}
 .tfg{display:flex;gap:3px;}
-.tfb{padding:3px 8px;cursor:pointer;font-family:var(--disp);font-size:.73em;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);background:var(--bg3);border-radius:2px;transition:all .15s;}
+.tfb{padding:4px 10px;cursor:pointer;font-family:var(--disp);font-size:.85em;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);background:var(--bg3);border-radius:2px;transition:all .15s;}
 .tfb.on{color:var(--amber);border-color:var(--amber);background:rgba(255,170,0,.08);}
 .tfb:hover:not(.on){color:var(--white);border-color:var(--dim);}
 .sep{width:1px;height:18px;background:var(--border);}
-.ibtn{padding:3px 8px;cursor:pointer;font-size:.82em;border:1px solid var(--border);background:var(--bg3);border-radius:2px;color:var(--dim);transition:all .15s;font-family:var(--mono);white-space:nowrap;}
+.ibtn{padding:4px 10px;cursor:pointer;font-size:.95em;border:1px solid var(--border);background:var(--bg3);border-radius:2px;color:var(--dim);transition:all .15s;font-family:var(--mono);white-space:nowrap;}
 .ibtn.on{color:var(--green);border-color:var(--green);background:rgba(0,255,136,.08);}
 .ibtn.amb{color:var(--amber);border-color:var(--amber);background:rgba(255,170,0,.08);}
 .ibtn:hover{color:var(--white);border-color:var(--dim);}
@@ -51,31 +51,31 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 /* PRICE BAR */
 .pbar{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);flex-shrink:0;}
 .pc{background:var(--bg2);padding:5px 10px;}
-.pl{color:var(--dim);font-size:.73em;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
-.pv{font-family:var(--disp);font-size:1.09em;font-weight:700;}
+.pl{color:var(--dim);font-size:.85em;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+.pv{font-family:var(--disp);font-size:1.25em;font-weight:700;}
 .pv.up{color:var(--green);}.pv.dn{color:var(--red);}.pv.nt{color:var(--white);}
 
 /* ALERT BAR */
 .abar{background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;}
 .abar-hdr{display:flex;align-items:center;gap:8px;padding:3px 12px;background:var(--bg3);border-bottom:1px solid var(--border);}
-.albl{font-family:var(--disp);font-size:.73em;letter-spacing:3px;color:var(--amber);}
-.acnt{background:rgba(255,170,0,.2);color:var(--amber);border:1px solid rgba(255,170,0,.3);padding:1px 5px;border-radius:10px;font-size:.73em;}
-.athr{color:var(--dim);font-size:.73em;margin-left:auto;}
+.albl{font-family:var(--disp);font-size:.85em;letter-spacing:3px;color:var(--amber);}
+.acnt{background:rgba(255,170,0,.2);color:var(--amber);border:1px solid rgba(255,170,0,.3);padding:1px 5px;border-radius:10px;font-size:.85em;}
+.athr{color:var(--dim);font-size:.85em;margin-left:auto;}
 .asc{overflow-x:auto;overflow-y:hidden;white-space:nowrap;padding:4px 8px;height:48px;display:flex;align-items:center;gap:5px;scroll-behavior:smooth;}
 .asc::-webkit-scrollbar{height:3px;}
 .asc::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px;}
-.asc-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);cursor:pointer;padding:0 7px;height:20px;border-radius:2px;font-size:.75em;flex-shrink:0;}
+.asc-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);cursor:pointer;padding:0 9px;height:24px;border-radius:2px;font-size:.9em;flex-shrink:0;}
 .asc-btn:hover{color:var(--amber);border-color:var(--amber);}
 .achip{display:inline-flex;flex-direction:column;gap:1px;padding:3px 8px;border-radius:3px;border-left:3px solid;flex-shrink:0;min-width:150px;animation:cin .3s ease;}
 @keyframes cin{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
 .achip.w{background:rgba(255,215,0,.07);border-left-color:var(--wgold);}
 .achip.i{background:rgba(204,136,255,.07);border-left-color:var(--ipur);}
-.ctop{display:flex;gap:6px;align-items:center;font-size:.82em;}
-.ctype{font-family:var(--disp);font-size:.64em;letter-spacing:1px;}
+.ctop{display:flex;gap:6px;align-items:center;font-size:.95em;}
+.ctype{font-family:var(--disp);font-size:.75em;letter-spacing:1px;}
 .ctype.w{color:var(--wgold);}.ctype.i{color:var(--ipur);}
-.cbot{display:flex;gap:5px;font-size:.64em;color:var(--dim);}
+.cbot{display:flex;gap:5px;font-size:.75em;color:var(--dim);}
 .cusd{color:var(--amber);}
-.noal{color:var(--dim);font-size:.82em;letter-spacing:2px;padding:0 12px;}
+.noal{color:var(--dim);font-size:.95em;letter-spacing:2px;padding:0 12px;}
 
 /* CHART AREA */
 .chart-wrap{position:relative;background:var(--bg);flex-shrink:0;height:300px;}
@@ -98,29 +98,29 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 /* PANELS — 3 columns for trade management */
 .panels{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);flex:1;min-height:0;overflow:hidden;}
 .panel{background:var(--bg2);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
-.ph{padding:5px 10px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--disp);font-size:.73em;letter-spacing:2px;color:var(--cdim);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.ph{padding:5px 10px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--disp);font-size:.85em;letter-spacing:2px;color:var(--cdim);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .pb{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;}
 .pb::-webkit-scrollbar{width:2px;}
 .pb::-webkit-scrollbar-thumb{background:var(--dim);}
 
 /* VP PANEL */
 .vpr{display:flex;align-items:center;gap:3px;padding:1.5px 5px;border-bottom:1px solid rgba(10,20,35,.5);}
-.vpp{width:64px;text-align:right;font-size:.82em;flex-shrink:0;display:flex;align-items:center;gap:2px;justify-content:flex-end;}
+.vpp{width:64px;text-align:right;font-size:.95em;flex-shrink:0;display:flex;align-items:center;gap:2px;justify-content:flex-end;}
 .vpb2{flex:1;display:flex;gap:1px;align-items:center;height:10px;}
 .vb{height:100%;border-radius:1px 0 0 1px;min-width:1px;}
 .vs{height:100%;border-radius:0 1px 1px 0;min-width:1px;}
 .vm{width:1px;background:var(--dim);height:100%;flex-shrink:0;}
 .dm{padding:5px 10px;background:var(--bg3);border-top:1px solid var(--border);flex-shrink:0;}
-.dlbl{display:flex;justify-content:space-between;margin-bottom:3px;font-size:.73em;}
+.dlbl{display:flex;justify-content:space-between;margin-bottom:3px;font-size:.85em;}
 .dbc{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;}
 .dbf{height:100%;border-radius:3px;transition:width .3s,background .3s;}
 .sr{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);}
 .sc{background:var(--bg2);padding:4px 8px;text-align:center;}
-.sl2{color:var(--dim);font-size:.64em;letter-spacing:1px;margin-bottom:1px;}
-.sv{font-family:var(--disp);font-size:.82em;color:var(--cyan);}
+.sl2{color:var(--dim);font-size:.75em;letter-spacing:1px;margin-bottom:1px;}
+.sv{font-family:var(--disp);font-size:.95em;color:var(--cyan);}
 
 /* TRADE JOURNAL & RISK PANELS */
-.journal-entry{padding:6px 8px;border-bottom:1px solid var(--border);font-size:.75em;}
+.journal-entry{padding:6px 8px;border-bottom:1px solid var(--border);font-size:.85em;}
 .journal-header{display:flex;justify-content:space-between;margin-bottom:3px;}
 .journal-type{font-weight:bold;font-family:var(--disp);}
 .journal-type.buy{color:var(--green);}
@@ -222,8 +222,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   background:rgba(10,20,40,.6);
   border:1px solid var(--border);
   color:var(--dim);
-  padding:4px 10px;
-  font-size:.7em;
+  padding:6px 14px;
+  font-size:.85em;
   font-family:var(--mono);
   cursor:pointer;
   border-radius:3px;
@@ -260,6 +260,10 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 /* Tablet & Mobile (max-width: 768px) */
 @media (max-width: 768px) {
+  /* Enable full page scrolling */
+  html,body{height:auto;overflow-y:auto;overflow-x:hidden;}
+  body{display:block;min-height:100vh;}
+  
   /* Header - Stack vertically */
   .hdr{flex-direction:column;gap:6px;padding:8px 10px;}
   .title{font-size:.9em;letter-spacing:2px;text-align:center;}
@@ -268,92 +272,97 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   /* Controls - Wrap elements */
   .ctrl{flex-wrap:wrap;padding:4px 8px;gap:4px;}
   .stabs{order:1;width:100%;justify-content:center;}
-  .stab{padding:5px 10px;font-size:.7em;}
+  .stab{padding:5px 10px;font-size:.8em;}
   .cr{order:2;width:100%;justify-content:center;flex-wrap:wrap;}
   .mode-selector{order:1;margin-right:0;margin-bottom:4px;}
-  .mode-btn{padding:4px 8px;font-size:.65em;}
+  .mode-btn{padding:4px 8px;font-size:.75em;}
   .tfg{order:1;}
   .sep{display:none;}
-  .ibtn{padding:3px 6px;font-size:.7em;}
+  .ibtn{padding:3px 6px;font-size:.8em;}
   
   /* Price bar - 3 columns */
   .pbar{grid-template-columns:repeat(3,1fr);}
   .pc{padding:4px 6px;}
-  .pl{font-size:.65em;}
-  .pv{font-size:.95em;}
+  .pl{font-size:.75em;}
+  .pv{font-size:1.05em;}
   
   /* Alert bar - Compact */
   .abar-hdr{padding:3px 8px;}
-  .albl{font-size:.65em;}
+  .albl{font-size:.75em;}
   .athr{display:none;}
   .asc{height:40px;padding:3px 6px;}
-  .achip{min-width:120px;padding:2px 6px;font-size:.75em;}
-  .ctype{font-size:.6em;}
-  .cbot{font-size:.58em;}
+  .achip{min-width:120px;padding:2px 6px;font-size:.85em;}
+  .ctype{font-size:.7em;}
+  .cbot{font-size:.7em;}
   
   /* Charts - Reduced height */
   .chart-wrap{height:220px !important;}
-  .chdr{font-size:.65em;padding:3px 8px;}
-  .leg{gap:4px;font-size:.58em;}
+  .chdr{font-size:.75em;padding:3px 8px;}
+  .leg{gap:4px;font-size:.7em;}
   #vpc{width:50px;}
   .fp-chart-wrap{height:220px !important;}
-  .fp-chart-hdr{font-size:.65em;padding:3px 8px;}
+  .fp-chart-hdr{font-size:.75em;padding:3px 8px;}
   
-  /* Panels - Stack vertically */
-  .panels{grid-template-columns:1fr !important;grid-template-rows:auto auto auto;}
-  .panel{max-height:33vh;}
-  .ph{font-size:.65em;padding:4px 8px;}
+  /* Panels - Stack vertically with collapsible headers */
+  .panels{grid-template-columns:1fr !important;grid-template-rows:auto;display:block;background:transparent;}
+  .panel{max-height:none;margin-bottom:8px;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+  .ph{font-size:.75em;padding:4px 8px;cursor:pointer;user-select:none;position:relative;}
+  .ph::after{content:'▼';position:absolute;right:10px;font-size:.9em;transition:transform .2s;}
+  .ph.collapsed::after{transform:rotate(-90deg);}
+  .pb{max-height:400px;transition:max-height .3s ease;overflow-y:auto;}
+  .pb.collapsed{max-height:0;overflow:hidden;}
   
   /* Volume Profile - Smaller */
-  .vpp{width:50px;font-size:.75em;}
+  .vpp{width:50px;font-size:.85em;}
   .vpb2{height:8px;}
   .vb,.vs{height:8px;}
   
   /* Tape - Compact rows */
-  .trow{grid-template-columns:40px 60px 50px 1fr;padding:2px 6px;font-size:.75em;}
-  .tt{font-size:.65em;}
-  .tp{font-size:.82em;}
-  .tg{font-size:.58em;padding:1px 2px;}
+  .trow{grid-template-columns:40px 60px 50px 1fr;padding:2px 6px;font-size:.85em;}
+  .tt{font-size:.75em;}
+  .tp{font-size:.95em;}
+  .tg{font-size:.7em;padding:1px 2px;}
   
   /* Signal bar - Wrap conditions */
   .sigbar{flex-wrap:wrap;padding:4px 10px;gap:6px;}
-  .sig-label{font-size:.8em;}
+  .sig-label{font-size:.9em;}
   .sig-conditions{order:3;width:100%;}
-  .scon{font-size:.6em;padding:1px 4px;}
-  .sig-meta{font-size:.6em;}
+  .scon{font-size:.7em;padding:1px 4px;}
+  .sig-meta{font-size:.7em;}
   
   /* Trade Journal & Risk - Smaller */
-  .journal-entry{padding:4px 6px;font-size:.7em;}
-  .risk-input{width:50px;font-size:.7em;}
+  .journal-entry{padding:4px 6px;font-size:.8em;}
+  .risk-input{width:50px;font-size:.8em;}
   .stats-grid{gap:3px;padding:4px 6px;}
   .stat-box{padding:4px;}
-  .stat-value{font-size:.9em;}
+  .stat-value{font-size:1em;}
   
   /* Modals - Full width */
   .modal{width:95vw;max-height:85vh;}
-  .mhdr{font-size:.8em;padding:8px 10px;}
+  .mhdr{font-size:.9em;padding:8px 10px;}
   .mbd{padding:10px;}
   
   /* Toast - Responsive */
-  .sig-toast{top:60px;right:8px;left:8px;max-width:none;font-size:.7em;padding:8px 12px;}
+  .sig-toast{top:60px;right:8px;left:8px;max-width:none;font-size:.8em;padding:8px 12px;}
   
   /* Base font size */
-  :root{--fs:12px;}
+  :root{--fs:15px;}
 }
 
 /* Small phones (max-width: 480px) */
 @media (max-width: 480px) {
-  .title{font-size:.8em;letter-spacing:1px;}
-  .stab{padding:4px 8px;font-size:.65em;}
-  .mode-btn{padding:3px 6px;font-size:.6em;}
-  .tfb{padding:2px 6px;font-size:.65em;}
+  .title{font-size:.9em;letter-spacing:1px;}
+  .stab{padding:4px 8px;font-size:.75em;}
+  .mode-btn{padding:3px 6px;font-size:.7em;}
+  .tfb{padding:2px 6px;font-size:.75em;}
   .pbar{grid-template-columns:repeat(2,1fr);}
   .chart-wrap{height:180px !important;}
   .fp-chart-wrap{height:180px !important;}
-  .panel{max-height:30vh;}
+  .panel{margin-bottom:6px;}
+  .pb{max-height:300px;}
   .sigbar{padding:3px 8px;}
-  .sig-label{font-size:.7em;}
-  :root{--fs:11px;}
+  .sig-label{font-size:.8em;}
+  :root{--fs:14px;}
 }
 
 /* Landscape mobile */
@@ -392,8 +401,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   <div class="cr">
     <!-- Trading Mode Selector -->
     <div class="mode-selector" style="display:flex;gap:3px;margin-right:8px">
-      <button class="mode-btn" id="modeScalp" onclick="setTradingMode('scalp')" title="Scalping: Fast signals, lower threshold">⚡ SCALP</button>
-      <button class="mode-btn on" id="modeDay" onclick="setTradingMode('day')" title="Day Trading: Balanced signals">📊 DAY</button>
+      <button class="mode-btn on" id="modeScalp" onclick="setTradingMode('scalp')" title="Scalping: Fast signals, lower threshold">⚡ SCALP</button>
+      <button class="mode-btn" id="modeDay" onclick="setTradingMode('day')" title="Day Trading: Balanced signals">📊 DAY</button>
       <button class="mode-btn" id="modeSwing" onclick="setTradingMode('swing')" title="Swing Trading: High quality, fewer signals">🎯 SWING</button>
     </div>
     <div class="sep"></div>
@@ -528,39 +537,63 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     <div class="pb" style="display:flex;flex-direction:column;overflow-y:auto;">
       <!-- Risk Calculator -->
       <div class="risk-panel">
-        <div style="font-family:var(--disp);font-size:.7em;color:var(--amber);letter-spacing:2px;margin-bottom:6px;">💰 RISK CALCULATOR</div>
-        <div style="font-size:.6em;color:var(--dim);margin-bottom:4px;">Trade Direction:</div>
-        <div style="display:flex;gap:4px;margin-bottom:8px;">
-          <button onclick="setTradeDir('buy')" id="dirBuy" style="flex:1;padding:5px;background:rgba(0,255,136,.2);border:2px solid var(--green);color:var(--green);cursor:pointer;font-size:.7em;font-weight:bold;border-radius:2px;">▲ BUY</button>
-          <button onclick="setTradeDir('sell')" id="dirSell" style="flex:1;padding:5px;background:none;border:1px solid var(--border);color:var(--dim);cursor:pointer;font-size:.7em;border-radius:2px;">▼ SELL</button>
+        <div style="font-family:var(--disp);font-size:.7em;color:var(--amber);letter-spacing:2px;margin-bottom:6px;">💰 INSTITUTIONAL RISK MANAGER</div>
+        
+        <!-- Account Settings -->
+        <div style="margin-bottom:8px;">
+          <div style="font-size:.6em;color:var(--dim);margin-bottom:3px;">ACCOUNT EQUITY</div>
+          <input type="number" id="accountBalance" class="risk-input" value="100000" onchange="updateRiskCalc()" style="width:100%;padding:6px;background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--white);font-size:.75em;border-radius:2px;">
         </div>
-        <div class="risk-row">
-          <span class="risk-label">Account Balance ($)</span>
-          <input type="number" id="accountBalance" class="risk-input" value="10000" onchange="updateRiskCalc()">
+        
+        <!-- Risk Parameters -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+          <div>
+            <div style="font-size:.6em;color:var(--dim);margin-bottom:3px;">RISK/TRADE (%)</div>
+            <input type="number" id="riskPercent" class="risk-input" value="1" step="0.25" min="0.25" max="3" onchange="updateRiskCalc()" style="width:100%;padding:6px;background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--cyan);font-size:.75em;border-radius:2px;">
+          </div>
+          <div>
+            <div style="font-size:.6em;color:var(--dim);margin-bottom:3px;">MAX DRAWDOWN (%)</div>
+            <input type="number" id="maxDrawdown" class="risk-input" value="5" step="1" min="2" max="10" onchange="updateRiskCalc()" style="width:100%;padding:6px;background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--amber);font-size:.75em;border-radius:2px;">
+          </div>
         </div>
-        <div class="risk-row">
-          <span class="risk-label">Risk Per Trade (%)</span>
-          <input type="number" id="riskPercent" class="risk-input" value="1" step="0.5" min="0.5" max="5" onchange="updateRiskCalc()">
+        
+        <!-- Volatility Adjustment -->
+        <div style="margin-bottom:8px;">
+          <div style="font-size:.6em;color:var(--dim);margin-bottom:3px;">VOLATILITY ADJUSTMENT (ATR Multiplier)</div>
+          <select id="atrMultiplier" onchange="updateRiskCalc()" style="width:100%;padding:6px;background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--white);font-size:.75em;border-radius:2px;">
+            <option value="1">Conservative (1× ATR)</option>
+            <option value="1.5" selected>Balanced (1.5× ATR)</option>
+            <option value="2">Aggressive (2× ATR)</option>
+            <option value="2.5">Wide Stop (2.5× ATR)</option>
+          </select>
         </div>
-        <div class="risk-row">
-          <span class="risk-label">Entry Price</span>
-          <span class="risk-value" id="entryPriceDisplay">---</span>
+        
+        <!-- Real-time Metrics Display -->
+        <div style="background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:3px;padding:6px;margin-bottom:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.65em;">
+            <div style="color:var(--dim);">Dollar Risk:</div>
+            <div id="dollarRiskDisplay" style="color:var(--red);text-align:right;font-weight:bold;">$0</div>
+            
+            <div style="color:var(--dim);">Position Size:</div>
+            <div id="positionSizeDisplay" style="color:var(--cyan);text-align:right;font-weight:bold;">0 units</div>
+            
+            <div style="color:var(--dim);">Stop Distance:</div>
+            <div id="stopDistanceDisplay" style="color:var(--amber);text-align:right;">0%</div>
+            
+            <div style="color:var(--dim);">Max Open Trades:</div>
+            <div id="maxTradesDisplay" style="color:var(--green);text-align:right;">0</div>
+          </div>
         </div>
-        <div class="risk-row">
-          <span class="risk-label">Stop Loss</span>
-          <span class="risk-value" id="stopLossDisplay" style="color:var(--red)">---</span>
+        
+        <!-- Active Positions Warning -->
+        <div id="positionWarning" style="display:none;font-size:.6em;color:var(--red);background:rgba(255,51,85,.1);border:1px solid var(--red);padding:4px;border-radius:2px;margin-bottom:6px;text-align:center;">
+          ⚠️ MAX POSITIONS REACHED - Close existing trade first
         </div>
-        <div class="risk-row">
-          <span class="risk-label">Take Profit</span>
-          <span class="risk-value" id="takeProfitDisplay" style="color:var(--green)">---</span>
-        </div>
-        <div class="risk-row" style="border-top:2px solid var(--border);margin-top:4px;padding-top:6px;">
-          <span class="risk-label">Position Size</span>
-          <span class="risk-value" id="positionSizeDisplay" style="color:var(--cyan);font-size:.9em">---</span>
-        </div>
-        <div class="risk-row">
-          <span class="risk-label">Risk/Reward</span>
-          <span class="risk-value" id="rrRatioDisplay" style="color:var(--amber)">---</span>
+        
+        <!-- Execution Buttons -->
+        <div style="display:flex;gap:6px;">
+          <button onclick="executeManualTrade('buy')" id="execBuyBtn" style="flex:1;padding:8px;background:rgba(0,255,136,.2);border:2px solid var(--green);color:var(--green);cursor:pointer;font-size:.75em;font-weight:bold;border-radius:3px;">▲ EXECUTE BUY</button>
+          <button onclick="executeManualTrade('sell')" id="execSellBtn" style="flex:1;padding:8px;background:rgba(255,51,85,.2);border:2px solid var(--red);color:var(--red);cursor:pointer;font-size:.75em;font-weight:bold;border-radius:3px;">▼ EXECUTE SELL</button>
         </div>
       </div>
 
@@ -713,9 +746,9 @@ const TRADING_MODES = {
   }
 };
 
-let activeMode = 'day'; // Default to day trading mode
+let activeMode = 'scalp'; // Default to M5 scalping mode
 
-let activeSym='PAXGUSDT', activeTF=15;
+let activeSym='PAXGUSDT', activeTF=5;
 let vpOn=true;
 let viewMode=0; // 0=candlestick, 1=footprint, 2=heatmap
 let ws=null;
@@ -1107,73 +1140,174 @@ function saveJournal() {
   }
 }
 
-// Add a new trade to journal (called when signal fires)
-function addTradeToJournal(signal) {
-  // Get current SL/TP from risk calculator
-  const accountBalance = parseFloat(document.getElementById('accountBalance')?.value) || 10000;
-  const riskPercent = parseFloat(document.getElementById('riskPercent')?.value) || 1;
+// Add a new trade to journal (called when user clicks Buy/Sell)
+function executeManualTrade(direction) {
   const s = ST[activeSym];
-  const currentPrice = signal.price;
+  const currentPrice = s.last;
   
-  // Calculate SL/TP based on signal direction
+  if (!currentPrice) {
+    console.warn('⚠️ No current price available');
+    return;
+  }
+  
+  // Institutional-grade SL/TP calculation
+  // Based on Volume Profile structure, not arbitrary percentages
   const vpKeys = Object.keys(s.vp);
+  
+  // Find structural levels from Volume Profile
   let nearestSupport = null;
   let nearestResistance = null;
+  let pocPrice = null;
+  let pocVolume = 0;
   
   vpKeys.forEach(k => {
     const price = parseFloat(k);
     const lv = s.vp[k];
-    const tot = lv.buy + lv.sell;
-    const buyRatio = lv.buy / tot;
+    const totalVolume = lv.buy + lv.sell;
+    const buyRatio = lv.buy / totalVolume;
     
-    if (tot > 100) {
+    // Track POC (Point of Control)
+    if (totalVolume > pocVolume) {
+      pocVolume = totalVolume;
+      pocPrice = price;
+    }
+    
+    // Find significant support/resistance levels (high volume nodes)
+    if (totalVolume > 100) {
       if (price < currentPrice && buyRatio > 0.55) {
+        // Bullish high-volume node below = support
         if (!nearestSupport || price > nearestSupport) nearestSupport = price;
       }
       if (price > currentPrice && buyRatio < 0.45) {
+        // Bearish high-volume node above = resistance
         if (!nearestResistance || price < nearestResistance) nearestResistance = price;
       }
     }
   });
   
-  // Calculate SL/TP based on trading mode (optimal settings)
-  const modeConfig = TRADING_MODES[activeMode];
+  // Institutional SL placement: Beyond structural level + buffer
+  // NOT arbitrary percentage - placed where market structure invalidates the trade
   let stopLoss, takeProfit;
   
-  if (signal.direction === 'sell') {
-    // SELL: Stop above, target below
-    stopLoss = signal.price * (1 + modeConfig.stopLossPct);
-    takeProfit = signal.price * (1 - modeConfig.takeProfitPct);
+  if (direction === 'sell') {
+    // SELL trade:
+    // - SL above nearest resistance (invalidation point)
+    // - TP at support level or measured move
+    const atrMultiplier = parseFloat(document.getElementById('atrMultiplier')?.value) || 1.5;
+    const buffer = currentPrice * 0.002 * atrMultiplier; // 0.2% buffer × ATR multiplier
+    
+    stopLoss = nearestResistance ? nearestResistance + buffer : currentPrice * 1.015;
+    
+    // TP1: Nearest support (scale out 50%)
+    // TP2: Measured move (1:2 R:R)
+    const riskDistance = stopLoss - currentPrice;
+    takeProfit = currentPrice - (riskDistance * 2); // 2:1 R:R
+    
+    // If support is closer than measured move, use support for conservative TP
+    if (nearestSupport && nearestSupport > takeProfit) {
+      takeProfit = nearestSupport;
+    }
   } else {
-    // BUY: Stop below, target above
-    stopLoss = signal.price * (1 - modeConfig.stopLossPct);
-    takeProfit = signal.price * (1 + modeConfig.takeProfitPct);
+    // BUY trade:
+    // - SL below nearest support (invalidation point)
+    // - TP at resistance level or measured move
+    const atrMultiplier = parseFloat(document.getElementById('atrMultiplier')?.value) || 1.5;
+    const buffer = currentPrice * 0.002 * atrMultiplier; // 0.2% buffer × ATR multiplier
+    
+    stopLoss = nearestSupport ? nearestSupport - buffer : currentPrice * 0.985;
+    
+    // TP1: Nearest resistance (scale out 50%)
+    // TP2: Measured move (1:2 R:R)
+    const riskDistance = currentPrice - stopLoss;
+    takeProfit = currentPrice + (riskDistance * 2); // 2:1 R:R
+    
+    // If resistance is closer than measured move, use resistance for conservative TP
+    if (nearestResistance && nearestResistance < takeProfit) {
+      takeProfit = nearestResistance;
+    }
   }
   
   const trade = {
     id: Date.now(),
     timestamp: new Date().toISOString(),
     symbol: activeSym,
-    type: signal.direction, // 'buy' or 'sell'
-    entryPrice: signal.price,
+    type: direction,
+    entryPrice: currentPrice,
     stopLoss: stopLoss,
     takeProfit: takeProfit,
-    stars: signal.stars,
-    conditions: signal.conditions || [],
-    status: 'open', // open, closed, tp_hit, sl_hit
+    stars: '', // Manual trade, no star rating
+    conditions: [],
+    status: 'open',
     exitPrice: null,
     profitLoss: null,
-    exitReason: '', // manual, tp_hit, sl_hit
-    notes: ''
+    exitReason: '',
+    notes: 'Manual execution'
   };
   
-  tradeJournal.unshift(trade); // Add to beginning
-  if (tradeJournal.length > 200) tradeJournal.pop(); // Keep last 200 trades
+  tradeJournal.unshift(trade);
+  if (tradeJournal.length > 200) tradeJournal.pop();
   
   saveJournal();
   renderJournal();
   updateStats();
-  updateRiskCalc(); // Update risk calculator with new entry price
+  
+  // Add EP/TP/SL lines to chart
+  addTradeLinesToChart(currentPrice, stopLoss, takeProfit, direction);
+  
+  console.log(`✅ Trade executed: ${direction.toUpperCase()} @ $${currentPrice.toFixed(2)} | SL: $${stopLoss.toFixed(2)} | TP: $${takeProfit.toFixed(2)}`);
+}
+
+// Add trade lines to chart (EP/TP/SL)
+function addTradeLinesToChart(entryPrice, stopLoss, takeProfit, direction) {
+  if (!cs || typeof cs.createPriceLine !== 'function') {
+    console.warn('Chart not ready for trade lines');
+    return;
+  }
+  
+  const cfg = SYMS[activeSym];
+  
+  // Remove old trade lines if they exist
+  if (window.tradeLines) {
+    window.tradeLines.forEach(line => {
+      try { cs.removePriceLine(line); } catch(e) {}
+    });
+  }
+  window.tradeLines = [];
+  
+  // Entry Price line
+  const epLine = cs.createPriceLine({
+    price: entryPrice,
+    color: '#ffa500',
+    lineWidth: 2,
+    lineStyle: 2, // dashed
+    axisLabelVisible: true,
+    title: `EP $${entryPrice.toFixed(cfg.dec)}`
+  });
+  window.tradeLines.push(epLine);
+  
+  // Take Profit line
+  const tpLine = cs.createPriceLine({
+    price: takeProfit,
+    color: '#00ff88',
+    lineWidth: 2,
+    lineStyle: 2, // dashed
+    axisLabelVisible: true,
+    title: `TP $${takeProfit.toFixed(cfg.dec)}`
+  });
+  window.tradeLines.push(tpLine);
+  
+  // Stop Loss line
+  const slLine = cs.createPriceLine({
+    price: stopLoss,
+    color: '#ff3355',
+    lineWidth: 2,
+    lineStyle: 2, // dashed
+    axisLabelVisible: true,
+    title: `SL $${stopLoss.toFixed(cfg.dec)}`
+  });
+  window.tradeLines.push(slLine);
+  
+  console.log(`📊 Added trade lines: EP=${entryPrice.toFixed(2)}, TP=${takeProfit.toFixed(2)}, SL=${stopLoss.toFixed(2)}`);
 }
 
 // Close a trade (manually or automatically)
@@ -1274,6 +1408,9 @@ function checkSmartExits() {
     const currentPrice = s.last;
     exitsChecked++;
     
+    // Debug: Log trade details every check
+    console.log(`🔍 Checking trade ${trade.id}: ${trade.type.toUpperCase()} | Entry: $${trade.entryPrice.toFixed(2)} | SL: $${trade.stopLoss?.toFixed(2)} | TP: $${trade.takeProfit?.toFixed(2)} | Current: $${currentPrice.toFixed(2)}`);
+    
     // Check if TP or SL hit
     let exitPrice = null;
     let exitReason = null;
@@ -1282,17 +1419,21 @@ function checkSmartExits() {
       if (trade.takeProfit && currentPrice >= trade.takeProfit) {
         exitPrice = trade.takeProfit;
         exitReason = 'tp_hit';
+        console.log(`✅ TP HIT: Current $${currentPrice.toFixed(2)} >= TP $${trade.takeProfit.toFixed(2)}`);
       } else if (trade.stopLoss && currentPrice <= trade.stopLoss) {
         exitPrice = trade.stopLoss;
         exitReason = 'sl_hit';
+        console.log(`❌ SL HIT: Current $${currentPrice.toFixed(2)} <= SL $${trade.stopLoss.toFixed(2)}`);
       }
     } else { // sell
       if (trade.takeProfit && currentPrice <= trade.takeProfit) {
         exitPrice = trade.takeProfit;
         exitReason = 'tp_hit';
+        console.log(`✅ TP HIT: Current $${currentPrice.toFixed(2)} <= TP $${trade.takeProfit.toFixed(2)}`);
       } else if (trade.stopLoss && currentPrice >= trade.stopLoss) {
         exitPrice = trade.stopLoss;
         exitReason = 'sl_hit';
+        console.log(`❌ SL HIT: Current $${currentPrice.toFixed(2)} >= SL $${trade.stopLoss.toFixed(2)}`);
       }
     }
     
@@ -1311,6 +1452,70 @@ function checkSmartExits() {
       console.log(`   • ${t.type.toUpperCase()} ${t.symbol} | Entry: $${t.entryPrice.toFixed(2)} | SL: $${t.stopLoss?.toFixed(2) || 'N/A'} | TP: $${t.takeProfit?.toFixed(2) || 'N/A'} | Current: $${ST[t.symbol]?.last?.toFixed(2) || 'N/A'}`);
     });
   }
+}
+
+// Manual Price Alert System
+function checkManualAlerts() {
+  const now = Date.now();
+  let triggeredCount = 0;
+  
+  manualAlerts.forEach(alert => {
+    if (!alert.active) return;
+    
+    const s = ST[alert.symbol];
+    if (!s || !s.last) return;
+    
+    const currentPrice = s.last;
+    let triggered = false;
+    
+    if (alert.type === 'above' && currentPrice >= alert.price) {
+      triggered = true;
+    } else if (alert.type === 'below' && currentPrice <= alert.price) {
+      triggered = true;
+    }
+    
+    if (triggered) {
+      triggeredCount++;
+      // Deactivate alert to prevent repeated notifications
+      alert.active = false;
+      localStorage.setItem('manualAlerts', JSON.stringify(manualAlerts));
+      
+      // Notify user
+      const message = `🔔 PRICE ALERT TRIGGERED!\n\nSymbol: ${alert.symbol}\nAlert Price: $${alert.price.toFixed(SYMS[alert.symbol]?.dec || 2)}\nCurrent Price: $${currentPrice.toFixed(SYMS[alert.symbol]?.dec || 2)}\nType: ${alert.type.toUpperCase()}\n\nAlert has been deactivated.`;
+      
+      console.log(message);
+      alert(message);
+      
+      // Voice notification
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(
+          `Price alert triggered for ${alert.symbol}. Price is now ${alert.type} ${alert.price.toFixed(2)}.`
+        );
+        utterance.rate = 0.9;
+        speechSynthesis.speak(utterance);
+      }
+    }
+  });
+  
+  // Debug: Log active alerts every 10 seconds
+  if (now % 10000 < 1000) {
+    const activeCount = manualAlerts.filter(a => a.active).length;
+    if (activeCount > 0) {
+      console.log(`📊 Active alerts: ${activeCount}`, manualAlerts.filter(a => a.active).map(a => `$${a.price} (${a.type})`));
+    }
+  }
+}
+
+// Get visible prices from footprint chart for alert placement
+function getVisiblePrices() {
+  const s = ST[activeSym];
+  if (!s || !s.fp) return [];
+  
+  const fpKeys = Object.keys(s.fp).map(Number).sort((a,b) => a-b);
+  if (fpKeys.length === 0) return [];
+  
+  // Return all price levels in current view
+  return fpKeys;
 }
 
 // Render journal entries in the panel
@@ -1478,49 +1683,27 @@ function compareSessions() {
 }
 
 // Set trade direction manually or auto-update from signals
-function setTradeDir(dir) {
-  currentTradeDir = dir;
-  
-  // Update button styles
-  const buyBtn = document.getElementById('dirBuy');
-  const sellBtn = document.getElementById('dirSell');
-  
-  if (dir === 'buy') {
-    buyBtn.style.background = 'rgba(0,255,136,.2)';
-    buyBtn.style.border = '2px solid var(--green)';
-    buyBtn.style.color = 'var(--green)';
-    sellBtn.style.background = 'none';
-    sellBtn.style.border = '1px solid var(--border)';
-    sellBtn.style.color = 'var(--dim)';
-  } else {
-    sellBtn.style.background = 'rgba(255,51,85,.2)';
-    sellBtn.style.border = '2px solid var(--red)';
-    sellBtn.style.color = 'var(--red)';
-    buyBtn.style.background = 'none';
-    buyBtn.style.border = '1px solid var(--border)';
-    buyBtn.style.color = 'var(--dim)';
-  }
-  
-  updateRiskCalc();
-}
-
-// Risk Calculator - helps you size positions correctly
-function updateRiskCalc(signalType = null) {
-  const accountBalance = parseFloat(document.getElementById('accountBalance')?.value) || 10000;
+// Institutional Risk Calculator - VP-based structural levels
+function updateRiskCalc() {
+  const accountBalance = parseFloat(document.getElementById('accountBalance')?.value) || 100000;
   const riskPercent = parseFloat(document.getElementById('riskPercent')?.value) || 1;
+  const maxDrawdown = parseFloat(document.getElementById('maxDrawdown')?.value) || 5;
+  
   const s = ST[activeSym];
   const currentPrice = s.last || 0;
   
   if (!currentPrice) {
-    document.getElementById('entryPriceDisplay').textContent = '---';
-    document.getElementById('stopLossDisplay').textContent = '---';
-    document.getElementById('takeProfitDisplay').textContent = '---';
-    document.getElementById('positionSizeDisplay').textContent = '---';
-    document.getElementById('rrRatioDisplay').textContent = '---';
+    document.getElementById('dollarRiskDisplay').textContent = '$0';
+    document.getElementById('positionSizeDisplay').textContent = '0 units';
+    document.getElementById('stopDistanceDisplay').textContent = '0%';
+    document.getElementById('maxTradesDisplay').textContent = '0';
     return;
   }
   
-  // Find nearest support/resistance for stop loss and take profit
+  // Calculate dollar risk per trade
+  const dollarRisk = accountBalance * (riskPercent / 100);
+  
+  // Find VP structural levels for BOTH directions (for risk estimation)
   const vpKeys = Object.keys(s.vp);
   let nearestSupport = null;
   let nearestResistance = null;
@@ -1528,63 +1711,92 @@ function updateRiskCalc(signalType = null) {
   vpKeys.forEach(k => {
     const price = parseFloat(k);
     const lv = s.vp[k];
-    const tot = lv.buy + lv.sell;
-    const buyRatio = lv.buy / tot;
+    const totalVolume = lv.buy + lv.sell;
+    const buyRatio = lv.buy / totalVolume;
     
-    // Significant level
-    if (tot > 100) {
+    if (totalVolume > 100) {
       if (price < currentPrice && buyRatio > 0.55) {
-        if (!nearestSupport || price > nearestSupport) {
-          nearestSupport = price;
-        }
+        if (!nearestSupport || price > nearestSupport) nearestSupport = price;
       }
       if (price > currentPrice && buyRatio < 0.45) {
-        if (!nearestResistance || price < nearestResistance) {
-          nearestResistance = price;
-        }
+        if (!nearestResistance || price < nearestResistance) nearestResistance = price;
       }
     }
   });
   
-  // Calculate position sizing
-  const riskAmount = accountBalance * (riskPercent / 100);
+  // Calculate stop distance for BOTH directions (use the tighter one for conservative estimate)
+  const atrMultiplier = parseFloat(document.getElementById('atrMultiplier')?.value) || 1.5;
+  const buffer = currentPrice * 0.002 * atrMultiplier;
   
-  // For BUY signals: stop below support, target resistance
-  // For SELL signals: stop above resistance, target support
-  let stopLoss, takeProfit, stopDistance, targetDistance;
+  let buyStopDistance = nearestSupport ? (currentPrice - (nearestSupport - buffer)) : currentPrice * 0.015;
+  let sellStopDistance = nearestResistance ? ((nearestResistance + buffer) - currentPrice) : currentPrice * 0.015;
   
-  // Use signalType if provided, otherwise use currentTradeDir (manual or auto-set)
-  const direction = signalType || currentTradeDir;
+  // Use the smaller stop distance (more conservative risk estimate)
+  const stopDistance = Math.min(buyStopDistance, sellStopDistance);
+  const stopDistancePct = ((stopDistance / currentPrice) * 100).toFixed(2);
   
-  if (direction === 'sell') {
-    // SELL: Stop above, target below
-    stopDistance = nearestResistance ? (nearestResistance - currentPrice) : currentPrice * 0.005;
-    targetDistance = nearestSupport ? (currentPrice - nearestSupport) : currentPrice * 0.01;
-    stopLoss = currentPrice + stopDistance;  // ABOVE entry
-    takeProfit = currentPrice - targetDistance;  // BELOW entry
+  // Position size calculation: Dollar Risk / Stop Distance
+  const positionSize = dollarRisk / stopDistance;
+  
+  // Convert to lot size (institutional standard)
+  let lotSize, lotDisplay;
+  if (activeSym.includes('XAU')) {
+    // Gold: 1 lot = 100 oz
+    lotSize = positionSize / 100;
+    lotDisplay = lotSize.toFixed(2) + ' lots';
+  } else if (activeSym.includes('BTC')) {
+    // Bitcoin: 1 lot = 1 BTC
+    lotSize = positionSize;
+    lotDisplay = lotSize.toFixed(4) + ' BTC';
+  } else if (activeSym.includes('ETH')) {
+    // Ethereum: 1 lot = 1 ETH
+    lotSize = positionSize;
+    lotDisplay = lotSize.toFixed(3) + ' ETH';
+  } else if (activeSym.includes('PAXG')) {
+    // PAXG: 1 lot = 1 token
+    lotSize = positionSize;
+    lotDisplay = lotSize.toFixed(2) + ' PAXG';
   } else {
-    // BUY (default): Stop below, target above
-    stopDistance = nearestSupport ? (currentPrice - nearestSupport) : currentPrice * 0.005;
-    targetDistance = nearestResistance ? (nearestResistance - currentPrice) : currentPrice * 0.01;
-    stopLoss = currentPrice - stopDistance;  // BELOW entry
-    takeProfit = currentPrice + targetDistance;  // ABOVE entry
+    // Forex pairs: 1 lot = 100,000 units
+    lotSize = positionSize / 100000;
+    lotDisplay = lotSize.toFixed(2) + ' lots';
   }
   
-  // Position size = risk amount / stop distance
-  const positionSize = riskAmount / stopDistance;
+  // Calculate max open trades based on drawdown limit
+  const maxDollarDrawdown = accountBalance * (maxDrawdown / 100);
+  const maxOpenTrades = Math.floor(maxDollarDrawdown / dollarRisk);
   
-  // Risk/Reward ratio
-  const rrRatio = targetDistance / stopDistance;
+  // Count current open trades
+  const openTrades = tradeJournal.filter(t => t.status === 'open').length;
   
   // Update display
-  document.getElementById('entryPriceDisplay').textContent = '$' + currentPrice.toFixed(SYMS[activeSym].dec);
-  document.getElementById('stopLossDisplay').textContent = '$' + stopLoss.toFixed(SYMS[activeSym].dec);
-  document.getElementById('takeProfitDisplay').textContent = '$' + takeProfit.toFixed(SYMS[activeSym].dec);
-  document.getElementById('positionSizeDisplay').textContent = positionSize.toFixed(4) + ' ' + activeSym.replace('USDT', '');
+  document.getElementById('dollarRiskDisplay').textContent = '$' + dollarRisk.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+  document.getElementById('positionSizeDisplay').textContent = lotDisplay;
+  document.getElementById('stopDistanceDisplay').textContent = stopDistancePct + '%';
+  document.getElementById('maxTradesDisplay').textContent = maxOpenTrades;
   
-  const rrEl = document.getElementById('rrRatioDisplay');
-  rrEl.textContent = '1:' + rrRatio.toFixed(2);
-  rrEl.style.color = rrRatio >= 2 ? 'var(--green)' : rrRatio >= 1.5 ? 'var(--amber)' : 'var(--red)';
+  // Show warning if max positions reached
+  const warningEl = document.getElementById('positionWarning');
+  const execBuyBtn = document.getElementById('execBuyBtn');
+  const execSellBtn = document.getElementById('execSellBtn');
+  
+  if (openTrades >= maxOpenTrades) {
+    warningEl.style.display = 'block';
+    execBuyBtn.disabled = true;
+    execSellBtn.disabled = true;
+    execBuyBtn.style.opacity = '0.5';
+    execSellBtn.style.opacity = '0.5';
+    execBuyBtn.style.cursor = 'not-allowed';
+    execSellBtn.style.cursor = 'not-allowed';
+  } else {
+    warningEl.style.display = 'none';
+    execBuyBtn.disabled = false;
+    execSellBtn.disabled = false;
+    execBuyBtn.style.opacity = '1';
+    execSellBtn.style.opacity = '1';
+    execBuyBtn.style.cursor = 'pointer';
+    execSellBtn.style.cursor = 'pointer';
+  }
 }
 
 // Alert Quality Filter - categorize alerts by strength
@@ -1626,6 +1838,129 @@ const cs=lwChart.addCandlestickSeries({
   wickUpColor:'#00ff88',wickDownColor:'#ff3355'
 });
 
+// Manual alert on candlestick chart
+let lastAlertClick = 0;
+lwcEl.addEventListener('dblclick', (e) => {
+  // Debounce: prevent double-firing of dblclick
+  const now = Date.now();
+  if (now - lastAlertClick < 500) return;
+  lastAlertClick = now;
+  
+  const rect = lwcEl.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  try {
+    const price = cs.coordinateToPrice(y);
+    const timePoint = lwChart.timeScale().coordinateToTime(x);
+    
+    if (!price || !timePoint) return;
+    
+    const roundedPrice = Math.round(price * 100) / 100;
+    
+    // Check if clicking near an existing alert (within 15 pixels)
+    const tolerance = 15;
+    const existingAlert = manualAlerts.find(alert => {
+      if (!alert.active || alert.symbol !== activeSym) return false;
+      const alertY = cs.priceToCoordinate(alert.price);
+      return alertY && Math.abs(alertY - y) < tolerance;
+    });
+    
+    if (existingAlert) {
+      // Delete existing alert
+      const confirmDelete = confirm(`Delete alert at $${existingAlert.price.toFixed(SYMS[activeSym].dec)}?\n\nType: ${existingAlert.type.toUpperCase()}`);
+      if (confirmDelete) {
+        manualAlerts = manualAlerts.filter(a => a.id !== existingAlert.id);
+        localStorage.setItem('manualAlerts', JSON.stringify(manualAlerts));
+        updatePriceLines();
+        console.log(`🗑️ Alert deleted`);
+      }
+    } else {
+      // Create new alert
+      const alertType = prompt(`Set alert at $${roundedPrice.toFixed(SYMS[activeSym].dec)}\n\nType: above/below`, 'above');
+      if (!alertType || !['above', 'below'].includes(alertType.toLowerCase())) return;
+      
+      const alert = {
+        id: Date.now(),
+        symbol: activeSym,
+        price: roundedPrice,
+        type: alertType.toLowerCase(),
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      
+      manualAlerts.push(alert);
+      localStorage.setItem('manualAlerts', JSON.stringify(manualAlerts));
+      
+      console.log(`🔔 Alert set: ${alertType} $${roundedPrice.toFixed(SYMS[activeSym].dec)} on ${activeSym}`);
+      alert(`✅ Alert Set!\n\nSymbol: ${activeSym}\nPrice: $${roundedPrice.toFixed(SYMS[activeSym].dec)}\nTrigger: When price goes ${alertType}\n\n💡 Drag to move | Double-click to delete`);
+      
+      updatePriceLines();
+    }
+  } catch (err) {
+    console.error('Alert error:', err);
+  }
+});
+
+// Alert dragging functionality
+let draggingAlertId = null;
+let isDraggingAlert = false;
+
+lwcEl.addEventListener('mousedown', (e) => {
+  const rect = lwcEl.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  const price = cs.coordinateToPrice(y);
+  
+  if (!price) return;
+  
+  // Check if clicking near an alert line (within 10 pixels)
+  const tolerance = 10;
+  const clickedAlert = manualAlerts.find(alert => {
+    if (!alert.active || alert.symbol !== activeSym) return false;
+    const alertY = cs.priceToCoordinate(alert.price);
+    return alertY && Math.abs(alertY - y) < tolerance;
+  });
+  
+  if (clickedAlert) {
+    draggingAlertId = clickedAlert.id;
+    isDraggingAlert = true;
+    lwcEl.style.cursor = 'ns-resize';
+    e.preventDefault();
+  }
+});
+
+lwcEl.addEventListener('mousemove', (e) => {
+  if (!isDraggingAlert || !draggingAlertId) return;
+  
+  const rect = lwcEl.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  const price = cs.coordinateToPrice(y);
+  
+  if (!price) return;
+  
+  // Update alert price in real-time
+  const alert = manualAlerts.find(a => a.id === draggingAlertId);
+  if (alert) {
+    alert.price = Math.round(price * 100) / 100;
+    updatePriceLines();
+  }
+  
+  // Prevent chart from panning while dragging alert
+  e.preventDefault();
+  e.stopPropagation();
+});
+
+lwcEl.addEventListener('mouseup', () => {
+  if (isDraggingAlert && draggingAlertId) {
+    // Save updated position
+    localStorage.setItem('manualAlerts', JSON.stringify(manualAlerts));
+    console.log(`📍 Alert moved to new price`);
+  }
+  isDraggingAlert = false;
+  draggingAlertId = null;
+  lwcEl.style.cursor = 'default';
+});
+
 let pocLine=null,vahLine=null,valLine=null;
 function setLine(ref,price,color,title){
   if(ref){try{cs.removePriceLine(ref);}catch(e){}}
@@ -1638,7 +1973,56 @@ function resizeChart(){
   lwChart.applyOptions({width:el.clientWidth,height:el.clientHeight-22});
   drawVPC();
 }
-window.addEventListener('resize',()=>{resizeChart();drawFPChart();});
+window.addEventListener('resize',()=>{
+  resizeChart();
+  drawFPChart();
+  
+  // Handle mobile/desktop transition
+  const isMobile = window.innerWidth <= 768;
+  document.querySelectorAll('.ph').forEach(header => {
+    if (isMobile) {
+      header.style.cursor = 'pointer';
+      header.style.userSelect = 'none';
+    } else {
+      header.style.cursor = '';
+      header.style.userSelect = '';
+      // Reset collapsed state on desktop
+      header.classList.remove('collapsed');
+      const body = header.parentElement.querySelector('.pb');
+      if (body) body.classList.remove('collapsed');
+    }
+  });
+});
+
+// Mobile collapsible panels
+if (window.innerWidth <= 768) {
+  document.querySelectorAll('.ph').forEach(header => {
+    header.addEventListener('click', () => {
+      const panel = header.parentElement;
+      const body = panel.querySelector('.pb');
+      
+      if (body) {
+        header.classList.toggle('collapsed');
+        body.classList.toggle('collapsed');
+        
+        // Save state to localStorage
+        const panelId = panel.id || 'panel-' + Array.from(document.querySelectorAll('.panel')).indexOf(panel);
+        localStorage.setItem('panel-' + panelId, header.classList.contains('collapsed') ? 'collapsed' : 'expanded');
+      }
+    });
+    
+    // Restore saved state
+    const panel = header.parentElement;
+    const panelId = panel.id || 'panel-' + Array.from(document.querySelectorAll('.panel')).indexOf(panel);
+    const savedState = localStorage.getItem('panel-' + panelId);
+    
+    if (savedState === 'collapsed') {
+      header.classList.add('collapsed');
+      const body = panel.querySelector('.pb');
+      if (body) body.classList.add('collapsed');
+    }
+  });
+}
 
 // VP canvas overlay
 const vpcEl=document.getElementById('vpc');
@@ -3308,6 +3692,37 @@ function updatePriceLines(){
   pocLine=setLine(pocLine,parseFloat(st.poc),'#ffaa00','◆POC');
   vahLine=setLine(vahLine,st.vah,'rgba(0,255,136,.7)','VAH');
   valLine=setLine(valLine,st.val,'rgba(255,51,85,.7)','VAL');
+  
+  // Remove old manual alert lines
+  if (window.manualAlertLines) {
+    window.manualAlertLines.forEach(line => {
+      try { cs.removePriceLine(line); } catch(e) {}
+    });
+  }
+  window.manualAlertLines = [];
+  
+  // Add manual alert price lines
+  manualAlerts.forEach(alert => {
+    if (!alert.active || alert.symbol !== activeSym) return;
+    
+    const isAbove = alert.type === 'above';
+    const color = isAbove ? 'rgba(255,170,0,0.9)' : 'rgba(0,170,255,0.9)';
+    const title = (isAbove ? '↑' : '↓') + ' $' + alert.price.toFixed(SYMS[activeSym]?.dec || 2);
+    
+    try {
+      const line = cs.createPriceLine({
+        price: alert.price,
+        color: color,
+        lineWidth: 3,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: title
+      });
+      window.manualAlertLines.push(line);
+    } catch (err) {
+      console.error('Failed to create alert line:', err);
+    }
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -3342,6 +3757,9 @@ window.addEventListener('mousemove',(e)=>{
   drawFPChart();
 });
 window.addEventListener('mouseup',()=>{fpDragging=false;});
+
+// Manual alerts storage (initialized once)
+let manualAlerts = JSON.parse(localStorage.getItem('manualAlerts') || '[]');
 
 function getFPBars(){
   return Object.values(ST[activeSym].fp).sort((a,b)=>a.ts-b.ts);
@@ -3629,6 +4047,9 @@ setInterval(()=>{
 
   // Smart Exit Detection - check if any open trades hit TP or SL
   checkSmartExits();
+  
+  // Check manual price alerts
+  checkManualAlerts();
 
   // Redraw all panels — 1s cadence is plenty for UI freshness
   if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();updatePriceLines();});}
@@ -3880,9 +4301,6 @@ function evalSignal(){
       const starPct=activeScore.score/activeScore.total;
       if(starPct>=modeConfig.alertStars){
         lastSignal=direction; lastSignalTime=now;
-        
-        // Update risk calculator with signal type for correct SL/TP
-        setTradeDir(direction);
         
         // Track signal for validation
         trackSignal({
@@ -4158,25 +4576,9 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
   // Calculate star count first
   const starCount = stars.split('★').length - 1;
   
-  // Only journal 3+ star signals
-  if (starCount >= 3) {
-    // Add to trade journal automatically
-    const activeConds = dir === 'buy' ? 
-      [{label:'AT SUPPORT', pass:true}, {label:'VP BIAS BUY', pass:true}, {label:'POC ABOVE', pass:true}, 
-       {label:'FP DELTA +', pass:true}, {label:'CUMUL Δ +', pass:true}, {label:'BID WALL', pass:true}, {label:'WHALE BUY', pass:true}] :
-      [{label:'AT RESISTANCE', pass:true}, {label:'VP BIAS SELL', pass:true}, {label:'POC BELOW', pass:true}, 
-       {label:'FP DELTA -', pass:true}, {label:'CUMUL Δ -', pass:true}, {label:'ASK WALL', pass:true}, {label:'WHALE SELL', pass:true}];
-    
-    addTradeToJournal({
-      direction: dir,
-      price: price,
-      stars: stars,
-      conditions: activeConds
-    });
-  } else {
-    console.log(`📓 Skipping journal: only ${starCount} stars (need 3+)`);
-  }
+  // REMOVED: Automatic journal entry - trades only recorded when user clicks Buy/Sell
   console.log(`🔊 Signal received: ${dir} @ ${price}, stars="${stars}", starCount=${starCount}`);
+  console.log(`📓 Signal NOT auto-journalled - use Buy/Sell buttons to record trade`);
   
   // Play alert sound
   if(soundOn){
@@ -4396,12 +4798,28 @@ function renderHiLiq(){
     classified.push({...lv,type,label,tagStyle,desc,strength,distPct,visits});
   }
 
-  // ── Sort: strongest first, distance as tiebreaker ────────────
+  // ── Sort: 3-star first, then by sell% for resistance, buy% for support ────────────
   classified.sort((a,b)=>{
-    // Primary: strength descending (highest volume = most significant)
-    if(b.strength!==a.strength) return b.strength-a.strength;
-    // Secondary: distance ascending (closer levels more actionable)
-    return a.distPct-b.distPct;
+    // Primary: 3-star levels first (strength > 0.7)
+    const aThreeStar = a.strength > 0.7 ? 1 : 0;
+    const bThreeStar = b.strength > 0.7 ? 1 : 0;
+    if (bThreeStar !== aThreeStar) return bThreeStar - aThreeStar;
+    
+    // Secondary: For resistance/supply (above price), sort by highest sell% (lowest buyRatio)
+    // For support/demand (below price), sort by highest buy%
+    const aAbove = a.price > lastPrice;
+    const bAbove = b.price > lastPrice;
+    
+    if (aAbove && bAbove) {
+      // Both above: sort by lowest buyRatio (highest sell pressure)
+      return a.buyRatio - b.buyRatio;
+    } else if (!aAbove && !bAbove) {
+      // Both below: sort by highest buyRatio (highest buy pressure)
+      return b.buyRatio - a.buyRatio;
+    } else {
+      // Mixed: keep original strength order
+      return b.strength - a.strength;
+    }
   });
 
   document.getElementById('hiLiqCnt').textContent=classified.length;
