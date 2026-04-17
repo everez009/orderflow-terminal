@@ -777,7 +777,17 @@ function mkS(){
     trades:[],last:null,hi:null,lo:null,chg:null,
     delta:0,vol:0,n:0,alerts:[],
     priceTouches:{},lastTicker:null,lastSpoofAlert:0,
-    lastPriceRejectionAlert:0,lastDeltaDivergenceAlert:0,lastTradeAlert:0
+    lastPriceRejectionAlert:0,lastDeltaDivergenceAlert:0,lastTradeAlert:0,
+    // Run detection tracking
+    runTracker:{
+      priceHistory:[],      // Last 20 prices
+      deltaHistory:[],      // Last 20 delta values
+      momentumScore:0,      // -100 to +100
+      acceleration:0,       // Price change rate
+      consecutiveGreen:0,   // Consecutive bullish candles
+      buyPressure:0,        // Buy/sell ratio
+      earlyWarning:false    // Trigger flag
+    }
   };
 }
 const ST={PAXGUSDT:mkS(),BTCUSDT:mkS()};
@@ -2418,6 +2428,71 @@ function onTrade(sym,d){
 
   s.last=p;s.n++;s.vol+=usd;
   s.delta+=sell?-q:q;
+
+  //  RUN DETECTION: Track momentum for early bullish/bearish run detection
+  const rt = s.runTracker;
+  rt.priceHistory.push(p);
+  rt.deltaHistory.push(s.delta);
+  if (rt.priceHistory.length > 20) rt.priceHistory.shift();
+  if (rt.deltaHistory.length > 20) rt.deltaHistory.shift();
+  
+  // Calculate momentum score
+  if (rt.priceHistory.length >= 5) {
+    const recent5 = rt.priceHistory.slice(-5);
+    const older5 = rt.priceHistory.slice(-10, -5);
+    
+    // Price acceleration: compare recent 5 trades vs older 5
+    const recentAvg = recent5.reduce((a,b) => a+b, 0) / 5;
+    const olderAvg = older5.reduce((a,b) => a+b, 0) / 5;
+    const priceChange = (recentAvg - olderAvg) / olderAvg * 100;
+    rt.acceleration = priceChange;
+    
+    // Buy pressure: ratio of buy vs sell volume in recent trades
+    const recentTrades = s.trades.slice(0, 20);
+    const buyVol = recentTrades.filter(t => !t.sell).reduce((sum, t) => sum + t.usd, 0);
+    const sellVol = recentTrades.filter(t => t.sell).reduce((sum, t) => sum + t.usd, 0);
+    const totalVol = buyVol + sellVol;
+    rt.buyPressure = totalVol > 0 ? (buyVol - sellVol) / totalVol : 0;
+    
+    // Delta momentum: is delta increasing?
+    const recentDelta = rt.deltaHistory.slice(-5);
+    const olderDelta = rt.deltaHistory.slice(-10, -5);
+    const deltaTrend = recentDelta.length > 0 && olderDelta.length > 0 ?
+      (recentDelta[recentDelta.length-1] - olderDelta[0]) : 0;
+    
+    // Composite momentum score (-100 to +100)
+    rt.momentumScore = Math.max(-100, Math.min(100,
+      (priceChange * 1000) * 0.4 +      // Price acceleration (40% weight)
+      (rt.buyPressure * 100) * 0.4 +    // Buy pressure (40% weight)
+      (deltaTrend > 0 ? 50 : -50) * 0.2  // Delta trend (20% weight)
+    ));
+    
+    // Early warning: strong bullish momentum
+    if (rt.momentumScore > 60 && !rt.earlyWarning) {
+      rt.earlyWarning = true;
+      console.log(`🚀🚀 BULLISH RUN DETECTED! Momentum: ${rt.momentumScore.toFixed(1)} | Accel: ${rt.acceleration.toFixed(3)}% | Buy Pressure: ${(rt.buyPressure*100).toFixed(1)}%`);
+      
+      // Fire run detection alert
+      const runAlert = {
+        t: Date.now(),
+        sym,
+        type: '🚀 BULLISH RUN STARTING',
+        p,
+        note: `Momentum ${rt.momentumScore.toFixed(0)} | Buy pressure ${(rt.buyPressure*100).toFixed(0)}%`,
+        emoji: '🚀',
+        momentum: rt.momentumScore
+      };
+      s.alerts.unshift(runAlert);
+      if (s.alerts.length > 200) s.alerts.pop();
+      if (sym === activeSym) addChip(runAlert);
+      fireNotifs(runAlert);
+    }
+    
+    // Reset warning if momentum drops
+    if (rt.momentumScore < 30) {
+      rt.earlyWarning = false;
+    }
+  }
 
   // VP — use dynamic bucket, track visit count per level
   const dynBkt=cfg.dynBucket||cfg.bucket;
