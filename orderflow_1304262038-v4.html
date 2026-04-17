@@ -4660,9 +4660,9 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
   // Toast notification
   showToast(dir,price,stars,levelLabel,cfg);
 
-  // Telegram
+  // Telegram (3+ stars only)
   const c=getCfg();
-  if(c.tgTok&&c.tgCid){
+  if(starCount >= 3 && c.tgTok&&c.tgCid){
     const emoji=dir==='buy'?'🟢▲':'🔴▼';
     const msg=`${emoji} *${dir.toUpperCase()} SIGNAL* ${stars}\n${SYMS[activeSym].label}\n💰 $${price.toFixed(cfg.dec)}\n📌 ${levelLabel}\n📊 Score: ${score}/5 conditions\n⏰ ${new Date().toUTCString().slice(17,25)} UTC`;
     fetch(`https://api.telegram.org/bot${c.tgTok}/sendMessage`,{
@@ -4671,8 +4671,8 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
     }).catch(()=>{});
   }
 
-  // WhatsApp
-  if(c.waNr&&c.waKey){
+  // WhatsApp (3+ stars only)
+  if(starCount >= 3 && c.waNr&&c.waKey){
     const emoji=dir==='buy'?'▲ BUY':'▼ SELL';
     const waMsg=`${emoji} SIGNAL ${stars} - ${SYMS[activeSym].label} - $${price.toFixed(cfg.dec)} - ${levelLabel} - Score: ${score}/5 - ${new Date().toUTCString().slice(17,25)} UTC`;
     sendWA(waMsg,c);
