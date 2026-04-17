@@ -2415,11 +2415,6 @@ function onTrade(sym,d){
 
   s.last=p;s.n++;s.vol+=usd;
   s.delta+=sell?-q:q;
-  
-  // Check open trades for TP/SL hits
-  if (sym === activeSym) {
-    checkOpenTrades(p);
-  }
 
   // VP — use dynamic bucket, track visit count per level
   const dynBkt=cfg.dynBucket||cfg.bucket;
