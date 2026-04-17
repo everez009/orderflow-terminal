@@ -1131,10 +1131,32 @@ function checkHTFFilter(direction, htfBias) {
   return true; // Neutral or aligned
 }
 
-// Save journal to localStorage
+// Save journal to localStorage and sync to Supabase
 function saveJournal() {
   try {
     localStorage.setItem('orderflow_journal', JSON.stringify(tradeJournal));
+    
+    // Also sync latest trade to Supabase via API
+    if (tradeJournal.length > 0) {
+      const latestTrade = tradeJournal[0];
+      fetch('/api/trades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: latestTrade.symbol,
+          type: latestTrade.type,
+          entry_price: latestTrade.entryPrice,
+          stop_loss: latestTrade.stopLoss,
+          take_profit: latestTrade.takeProfit,
+          stars: latestTrade.stars || null,
+          conditions: latestTrade.conditions,
+          status: latestTrade.status,
+          notes: latestTrade.notes
+        })
+      }).then(r => r.json())
+        .then(data => console.log('✅ Trade synced to Supabase:', data))
+        .catch(err => console.error('❌ Supabase sync failed:', err));
+    }
   } catch(e) {
     console.error('Failed to save journal:', e);
   }
