@@ -701,8 +701,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 // CONFIG
 // ═══════════════════════════════════════════
 const SYMS={
-  PAXGUSDT:{label:'PAXG/USDT',whaleUSD:50000,instUSD:25000,bucket:0.5,dec:2,klSym:'PAXGUSDT'},
-  BTCUSDT: {label:'BTC/USDT', whaleUSD:500000,instUSD:150000,bucket:10,dec:1,klSym:'BTCUSDT'}
+  PAXGUSDT:{label:'PAXG/USDT',whaleUSD:5000,instUSD:2500,bucket:0.5,dec:2,klSym:'PAXGUSDT'},
+  BTCUSDT: {label:'BTC/USDT', whaleUSD:50000,instUSD:15000,bucket:10,dec:1,klSym:'BTCUSDT'}
 };
 const TF_MS={1:60000,5:300000,15:900000,60:3600000};
 const TF_KLINE={1:'1m',5:'5m',15:'15m',60:'1h'};
@@ -2529,8 +2529,8 @@ function onTrade(sym,d){
       console.log(`🐋 MEGA WHALE: ${(usd/cfg.whaleUSD).toFixed(1)}x threshold`);
     } else {
       // Skip institutional trades unless they're exceptionally large
-      if(usd < cfg.whaleUSD * 1.5) {
-        console.log(`⏭️ Institutional trade below 1.5× whale threshold ($${(cfg.whaleUSD * 1.5).toLocaleString()}), no alert fired`);
+      if(usd < cfg.whaleUSD * 1.0) {  // TEST MODE: Lowered from 1.5 to 1.0 for testing
+        console.log(`⏭️ Institutional trade below whale threshold ($${cfg.whaleUSD.toLocaleString()}), no alert fired`);
         s.trades.unshift(tr);
         if(s.trades.length>300)s.trades.pop();
         if(sym===activeSym)schedRender();
