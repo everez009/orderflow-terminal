@@ -1131,10 +1131,32 @@ function checkHTFFilter(direction, htfBias) {
   return true; // Neutral or aligned
 }
 
-// Save journal to localStorage
+// Save journal to localStorage and sync to Supabase
 function saveJournal() {
   try {
     localStorage.setItem('orderflow_journal', JSON.stringify(tradeJournal));
+    
+    // Also sync latest trade to Supabase via API
+    if (tradeJournal.length > 0) {
+      const latestTrade = tradeJournal[0];
+      fetch('/api/trades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: latestTrade.symbol,
+          type: latestTrade.type,
+          entry_price: latestTrade.entryPrice,
+          stop_loss: latestTrade.stopLoss,
+          take_profit: latestTrade.takeProfit,
+          stars: latestTrade.stars || null,
+          conditions: latestTrade.conditions,
+          status: latestTrade.status,
+          notes: latestTrade.notes
+        })
+      }).then(r => r.json())
+        .then(data => console.log('✅ Trade synced to Supabase:', data))
+        .catch(err => console.error('❌ Supabase sync failed:', err));
+    }
   } catch(e) {
     console.error('Failed to save journal:', e);
   }
@@ -2393,11 +2415,6 @@ function onTrade(sym,d){
 
   s.last=p;s.n++;s.vol+=usd;
   s.delta+=sell?-q:q;
-  
-  // Check open trades for TP/SL hits
-  if (sym === activeSym) {
-    checkOpenTrades(p);
-  }
 
   // VP — use dynamic bucket, track visit count per level
   const dynBkt=cfg.dynBucket||cfg.bucket;
@@ -4660,9 +4677,9 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
   // Toast notification
   showToast(dir,price,stars,levelLabel,cfg);
 
-  // Telegram
+  // Telegram (3+ stars only)
   const c=getCfg();
-  if(c.tgTok&&c.tgCid){
+  if(starCount >= 3 && c.tgTok&&c.tgCid){
     const emoji=dir==='buy'?'🟢▲':'🔴▼';
     const msg=`${emoji} *${dir.toUpperCase()} SIGNAL* ${stars}\n${SYMS[activeSym].label}\n💰 $${price.toFixed(cfg.dec)}\n📌 ${levelLabel}\n📊 Score: ${score}/5 conditions\n⏰ ${new Date().toUTCString().slice(17,25)} UTC`;
     fetch(`https://api.telegram.org/bot${c.tgTok}/sendMessage`,{
@@ -4671,8 +4688,8 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
     }).catch(()=>{});
   }
 
-  // WhatsApp
-  if(c.waNr&&c.waKey){
+  // WhatsApp (3+ stars only)
+  if(starCount >= 3 && c.waNr&&c.waKey){
     const emoji=dir==='buy'?'▲ BUY':'▼ SELL';
     const waMsg=`${emoji} SIGNAL ${stars} - ${SYMS[activeSym].label} - $${price.toFixed(cfg.dec)} - ${levelLabel} - Score: ${score}/5 - ${new Date().toUTCString().slice(17,25)} UTC`;
     sendWA(waMsg,c);
