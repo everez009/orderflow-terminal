@@ -2266,27 +2266,13 @@ function addSignalMarker(signal) {
   console.log(`✅ Signal marker added: ${stars} ${direction.toUpperCase()} @ $${price.toFixed(cfg.dec)} (time: ${timestamp})`);
 }
 
-// Add price lines for key levels with 3-star strength
+// Add price lines for key levels on chart — only strong ones to avoid clutter
 function addKeyLevelMarkers(classified) {
-  console.log(`🔍 addKeyLevelMarkers called with ${classified?.length || 0} levels`);
   if (!classified || !classified.length) return;
-  if (!cs || typeof cs.createPriceLine !== 'function') {
-    console.warn('cs not ready for key level lines');
-    return;
-  }
+  if (!cs || typeof cs.createPriceLine !== 'function') return;
   
   try {
     const cfg = SYMS[activeSym];
-    
-    // Find 3-star key levels
-    const threeStarLevels = classified.filter(lv => lv.strength > 0.7);
-    
-    console.log(`📊 Filtered to ${threeStarLevels.length} 3-star levels (>0.7 strength)`);
-    
-    if (!threeStarLevels.length) {
-      console.log(`No 3-star key levels (found ${classified.length} levels, strongest: ${Math.max(...classified.map(l=>l.strength)).toFixed(2)})`);
-      return;
-    }
     
     // Remove old key level lines
     if (window.keyLevelLines) {
@@ -2296,33 +2282,53 @@ function addKeyLevelMarkers(classified) {
     }
     window.keyLevelLines = [];
     
-    // Add price line for each 3-star key level
-    for (const lv of threeStarLevels) {
+    // Filter: only levels with high overall strength (>0.45 on the directional+volume scale)
+    // This is stricter than 3-star volume alone — must have conviction too
+    const strongLevels = classified.filter(lv => lv.overallStrength > 0.45);
+    
+    if (!strongLevels.length) return;
+    
+    // Limit to max 4 above price (resistance/supply) and 4 below price (support/demand)
+    // to prevent chart clutter
+    const abovePrice = strongLevels.filter(lv => lv.price > ST[activeSym].last);
+    const belowPrice = strongLevels.filter(lv => lv.price <= ST[activeSym].last);
+    
+    const maxPerSide = 4;
+    const selected = [
+      ...abovePrice.slice(0, maxPerSide),
+      ...belowPrice.slice(0, maxPerSide)
+    ];
+    
+    // Also enforce minimum spacing: if two levels are within 0.3% of each other, keep only the stronger one
+    const spaced = [];
+    const lastPrice = ST[activeSym].last;
+    for (const lv of selected) {
+      const tooClose = spaced.some(s => Math.abs(s.price - lv.price) / lastPrice < 0.003);
+      if (!tooClose) spaced.push(lv);
+    }
+    
+    // Add price line for each strong, spaced level
+    for (const lv of spaced) {
       const isSupport = lv.type === 'sup' || lv.type === 'ob-bull';
       
-      // Make lines translucent for better chart visibility
-      const color = isSupport ? 'rgba(0,255,136,0.6)' : 'rgba(255,51,85,0.6)';
-      const lineWidth = 2;
-      const lineStyle = LightweightCharts.LineStyle.Dashed;
-      
-      console.log(`📌 Creating line: ${lv.label} @ $${lv.price.toFixed(cfg.dec)} (strength: ${lv.strength.toFixed(2)}, support: ${isSupport})`);
+      // Thin, translucent lines so they don't obscure candles
+      const color = isSupport ? 'rgba(0,255,136,0.35)' : 'rgba(255,51,85,0.35)';
+      const lineWidth = 1;
+      const lineStyle = LightweightCharts.LineStyle.Dotted;
       
       const line = cs.createPriceLine({
         price: lv.price,
         color: color,
         lineWidth: lineWidth,
         lineStyle: lineStyle,
-        axisLabelVisible: true,
-        title: `${isSupport ? 'S' : 'R'} ${lv.label} $${lv.price.toFixed(cfg.dec)}`
+        axisLabelVisible: false,  // No labels to reduce clutter
+        title: ''
       });
       
       window.keyLevelLines.push(line);
     }
-    
-    console.log(`✅ Key level lines added: ${threeStarLevels.length} 3-star levels at prices: ${threeStarLevels.map(l=>'$'+l.price.toFixed(0)).join(', ')}`);
   } catch (e) {
     console.error('Key level lines error:', e);
-    // Don't break key levels display - just skip markers
   }
 }
 
