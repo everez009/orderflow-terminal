@@ -31,7 +31,7 @@ export default async function handler(
 
     // ── Retrieve Order Flow Data from Redis ────────────────
     const wallKeys = await redis.keys(`${keyPrefix}:wall:*`);
-    const walls = [];
+    const walls: any[] = [];
     for (const wallKey of wallKeys) {
       const wallData = await redis.get(wallKey);
       if (wallData) {
@@ -41,7 +41,13 @@ export default async function handler(
 
     // Retrieve spoof events
     const spoofKeys = await redis.keys(`${keyPrefix}:cancellations:*`);
-    const spoofs = [];
+    const spoofs: Array<{
+      price: number;
+      side: string;
+      cancelCount: number;
+      confidence: string;
+      reason: string;
+    }> = [];
     for (const spoofKey of spoofKeys) {
       const cancellations = await redis.lrange(spoofKey, 0, -1);
       const parsedCancels = cancellations.map((c: string) => JSON.parse(c));
@@ -65,7 +71,7 @@ export default async function handler(
 
     // Retrieve iceberg detections
     const icebergKeys = await redis.keys(`${keyPrefix}:iceberg:*`);
-    const icebergs = [];
+    const icebergs: any[] = [];
     for (const icebergKey of icebergKeys) {
       const icebergData = await redis.get(icebergKey);
       if (icebergData) {
