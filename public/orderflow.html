@@ -497,7 +497,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
   <div id="lwc"></div>
   <canvas id="vpc"></canvas>
-  <canvas id="zoneOverlay" style="position:absolute;top:22px;left:0;right:70px;bottom:0;pointer-events:none;z-index:15;"></canvas>
+  <canvas id="zoneOverlay" style="position:absolute;top:22px;left:0;right:0;bottom:0;pointer-events:none;z-index:50;"></canvas>
   <div class="loading-bar" id="loadingBar">
     <div class="lt" id="loadTxt">FETCHING KLINES...</div>
     <div class="lp"><div class="lpf" id="loadProg" style="width:0%"></div></div>
@@ -2137,14 +2137,16 @@ let lastZoneData=null;
 
 function drawZones(){
   const el=document.getElementById('chartWrap');
-  const W=el.clientWidth-70;
+  const W=el.clientWidth;
   const H=el.clientHeight-22;
   if(W<=0||H<=0)return;
   zoneEl.width=W;zoneEl.height=H;
   zoneCtx.clearRect(0,0,W,H);
   
   const s=ST[activeSym];
+  if(!s||!s.cb)return;
   const tfData=s.cb[activeTF];
+  if(!tfData)return;
   const barKeys=Object.keys(tfData).map(Number).sort((a,b)=>a-b);
   if(barKeys.length<20)return;
   
@@ -2162,6 +2164,9 @@ function drawZones(){
   const premiumUpper=rangeLow+range*0.786;
   const discountLower=rangeLow+range*0.214;
   
+  // Debug: log zone coordinates
+  console.log('🎯 ZONES:', {rangeHigh, rangeLow, range, premium, discount, equilibrium});
+  
   // Check if zones changed
   const zoneKey=`${rangeHigh.toFixed(2)}-${rangeLow.toFixed(2)}`;
   if(lastZoneData===zoneKey)return;
@@ -2171,67 +2176,76 @@ function drawZones(){
     // Premium zone (red, 61.8%-78.6%) - SELL ZONE
     const pTop=cs.priceToCoordinate(premiumUpper);
     const pBot=cs.priceToCoordinate(premium);
+    console.log('🔴 Premium coords:', {premiumUpper, premium, pTop, pBot});
     if(pTop!=null&&pBot!=null){
       const y1=Math.min(pTop,pBot);
       const y2=Math.max(pTop,pBot);
       const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
-      grad.addColorStop(0,'rgba(255,51,85,0.20)');
-      grad.addColorStop(1,'rgba(255,51,85,0.08)');
+      grad.addColorStop(0,'rgba(255,51,85,0.50)');
+      grad.addColorStop(0.5,'rgba(255,51,85,0.35)');
+      grad.addColorStop(1,'rgba(255,51,85,0.20)');
       zoneCtx.fillStyle=grad;
       zoneCtx.fillRect(0,y1,W,y2-y1);
-      zoneCtx.strokeStyle='rgba(255,51,85,0.5)';
-      zoneCtx.lineWidth=1;
-      zoneCtx.setLineDash([6,4]);
+      zoneCtx.strokeStyle='rgba(255,51,85,1)';
+      zoneCtx.lineWidth=2;
+      zoneCtx.setLineDash([8,4]);
       zoneCtx.strokeRect(0,y1,W,y2-y1);
       zoneCtx.setLineDash([]);
       // Label
-      zoneCtx.fillStyle='rgba(255,51,85,0.8)';
-      zoneCtx.font='Bold 9px Share Tech Mono';
+      zoneCtx.fillStyle='rgba(255,51,85,1)';
+      zoneCtx.font='Bold 11px Share Tech Mono';
       zoneCtx.textAlign='right';
-      zoneCtx.fillText('▓ PREMIUM ▓',W-4,y1+12);
+      zoneCtx.fillText('▓ PREMIUM ▓',W-8,y1+14);
     }
     
     // Discount zone (green, 21.4%-38.2%) - BUY ZONE
     const dTop=cs.priceToCoordinate(discount);
     const dBot=cs.priceToCoordinate(discountLower);
+    console.log('🟢 Discount coords:', {discount, discountLower, dTop, dBot});
     if(dTop!=null&&dBot!=null){
       const y1=Math.min(dTop,dBot);
       const y2=Math.max(dTop,dBot);
       const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
-      grad.addColorStop(0,'rgba(0,255,136,0.20)');
-      grad.addColorStop(1,'rgba(0,255,136,0.08)');
+      grad.addColorStop(0,'rgba(0,255,136,0.50)');
+      grad.addColorStop(0.5,'rgba(0,255,136,0.35)');
+      grad.addColorStop(1,'rgba(0,255,136,0.20)');
       zoneCtx.fillStyle=grad;
       zoneCtx.fillRect(0,y1,W,y2-y1);
-      zoneCtx.strokeStyle='rgba(0,255,136,0.5)';
-      zoneCtx.lineWidth=1;
-      zoneCtx.setLineDash([6,4]);
+      zoneCtx.strokeStyle='rgba(0,255,136,1)';
+      zoneCtx.lineWidth=2;
+      zoneCtx.setLineDash([8,4]);
       zoneCtx.strokeRect(0,y1,W,y2-y1);
       zoneCtx.setLineDash([]);
       // Label
-      zoneCtx.fillStyle='rgba(0,255,136,0.8)';
-      zoneCtx.font='Bold 9px Share Tech Mono';
+      zoneCtx.fillStyle='rgba(0,255,136,1)';
+      zoneCtx.font='Bold 11px Share Tech Mono';
       zoneCtx.textAlign='right';
-      zoneCtx.fillText('▓ DISCOUNT ▓',W-4,y1+12);
+      zoneCtx.fillText('▓ DISCOUNT ',W-8,y1+14);
     }
     
     // Equilibrium zone (cyan thin band at 50%)
     const eqTop=cs.priceToCoordinate(equilibrium+range*0.02);
     const eqBot=cs.priceToCoordinate(equilibrium-range*0.02);
+    console.log('🔵 EQ coords:', {equilibrium, eqTop, eqBot});
     if(eqTop!=null&&eqBot!=null){
       const y1=Math.min(eqTop,eqBot);
       const y2=Math.max(eqTop,eqBot);
       const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
-      grad.addColorStop(0,'rgba(0,204,255,0.25)');
-      grad.addColorStop(1,'rgba(0,204,255,0.12)');
+      grad.addColorStop(0,'rgba(0,204,255,0.50)');
+      grad.addColorStop(0.5,'rgba(0,204,255,0.35)');
+      grad.addColorStop(1,'rgba(0,204,255,0.20)');
       zoneCtx.fillStyle=grad;
       zoneCtx.fillRect(0,y1,W,y2-y1);
+      zoneCtx.strokeStyle='rgba(0,204,255,1)';
+      zoneCtx.lineWidth=2;
+      zoneCtx.strokeRect(0,y1,W,y2-y1);
       // Label
-      zoneCtx.fillStyle='rgba(0,204,255,0.8)';
-      zoneCtx.font='Bold 9px Share Tech Mono';
+      zoneCtx.fillStyle='rgba(0,204,255,1)';
+      zoneCtx.font='Bold 11px Share Tech Mono';
       zoneCtx.textAlign='right';
-      zoneCtx.fillText('▓ EQ 50% ▓',W-4,y1+10);
+      zoneCtx.fillText('▓ EQ 50% ▓',W-8,y1+12);
     }
-  }catch(e){}
+  }catch(e){console.error('drawZones error:',e);}
 }
 
 lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{drawVPC();drawZones();});
