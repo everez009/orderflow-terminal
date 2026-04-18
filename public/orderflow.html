@@ -4244,7 +4244,12 @@ async function trackOrderFlow() {
   lastOrderFlowUpdate = now;
   
   const s = ST[activeSym];
-  if (!s || !s.last) return;
+  if (!s || !s.last) {
+    console.log('⚠️ Order flow: No price data yet');
+    return;
+  }
+  
+  console.log('📡 Sending order flow data...');
   
   try {
     const recentTrades = [];
@@ -4274,6 +4279,8 @@ async function trackOrderFlow() {
       .filter(w => w.size > 0)
       .slice(0, 20);
     
+    console.log(`📊 DOM Data: ${bidWalls.length} bids, ${askWalls.length} asks, ${recentTrades.length} trades`);
+    
     const response = await fetch('/api/orderflow-tracker', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -4284,9 +4291,13 @@ async function trackOrderFlow() {
       })
     });
     
-    if (!response.ok) return;
+    if (!response.ok) {
+      console.error('❌ Order flow API error:', response.status);
+      return;
+    }
     
     const data = await response.json();
+    console.log('✅ Order flow response received');
     
     if (data.spoofs && data.spoofs.length > 0) {
       console.log('🚨 SPOOF DETECTED:', data.spoofs);
@@ -4298,12 +4309,12 @@ async function trackOrderFlow() {
     
     if (data.metrics.totalActiveWalls > 0) {
       console.log(`📊 Order Flow: ${data.metrics.totalActiveWalls} walls, ${data.metrics.spoofCount} spoofs, ${data.metrics.icebergCount} icebergs`);
+    } else {
+      console.log('📊 Order Flow: No significant walls detected');
     }
     
   } catch (error) {
-    if (error.message !== 'Failed to fetch') {
-      console.error('Order flow tracking error:', error);
-    }
+    console.error('❌ Order flow tracking error:', error.message);
   }
 }
 
