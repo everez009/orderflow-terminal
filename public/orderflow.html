@@ -4998,69 +4998,75 @@ function renderHiLiq(){
 
   // ── Calculate overall strength score for each level ────────────
   classified.forEach(lv => {
-    let typeScore = 0;
-    let biasScore = 0;
-    
     // Volume significance (0-1)
     const volScore = lv.strength;
     
     // Directional bias strength (how extreme the buy/sell ratio is)
-    // Perfect bias = 0 or 1, balanced = 0.5
+    // 0% buy = 1.0 bias, 50% buy = 0 bias, 100% buy = 1.0 bias
     const bias = Math.abs(lv.buyRatio - 0.5) * 2; // 0 to 1 scale
     
-    // Type-specific scoring:
-    // RESISTANCE (above + sell dominates): strength = volScore * bias (higher when sell% > 55%)
-    // SUPPORT (below + buy dominates): strength = volScore * bias (higher when buy% > 55%)
-    // SUPPLY (above + balanced): strength = volScore * (1 - bias) * 0.7 (penalize balanced)
-    // DEMAND (below + balanced): strength = volScore * (1 - bias) * 0.7
-    // BULL OB (above + buy dominates): strength = volScore * bias * 0.9 (slightly penalize for being above)
-    // BEAR OB (below + sell dominates): strength = volScore * bias * 0.9
-    
-    const isAbove = lv.price > lastPrice;
     const buyPct = lv.buyRatio;
+    const isAbove = lv.price > lastPrice;
+    
+    // ── CORE PRINCIPLE: Directional conviction matters MORE than volume ──
+    // A 2-star level with 75% sell is STRONGER than a 3-star with 50/50
+    
+    let directionalStrength = 0;
     
     switch(lv.type) {
-      case 'res': // RESISTANCE or SUPPLY above price
+      case 'res': // Above price
         if (buyPct < 0.45) {
-          // Strong resistance: sellers dominate above
-          typeScore = volScore * bias * 1.0;
+          // RESISTANCE: Sellers dominate above = strong for shorting
+          // Weight: 60% directional conviction + 40% volume
+          directionalStrength = (bias * 0.6 + volScore * 0.4) * 1.0;
+        } else if (buyPct < 0.55) {
+          // SUPPLY: Balanced above = weak, slight sell lean
+          // Penalize heavily for lack of conviction
+          directionalStrength = (bias * 0.3 + volScore * 0.2) * 0.5;
         } else {
-          // Balanced supply: penalize for lack of clear bias
-          typeScore = volScore * (1 - bias) * 0.6;
+          // BUYERS dominate above = Bull OB misclassified, very weak as supply
+          directionalStrength = (bias * 0.2 + volScore * 0.1) * 0.3;
         }
         break;
         
-      case 'sup': // SUPPORT or DEMAND below price
+      case 'sup': // Below price
         if (buyPct > 0.55) {
-          // Strong support: buyers dominate below
-          typeScore = volScore * bias * 1.0;
+          // SUPPORT: Buyers dominate below = strong for longing
+          // Weight: 60% directional conviction + 40% volume
+          directionalStrength = (bias * 0.6 + volScore * 0.4) * 1.0;
+        } else if (buyPct > 0.45) {
+          // DEMAND: Balanced below = weak, slight buy lean
+          // Penalize heavily for lack of conviction
+          directionalStrength = (bias * 0.3 + volScore * 0.2) * 0.5;
         } else {
-          // Balanced demand: penalize for lack of clear bias
-          typeScore = volScore * (1 - bias) * 0.6;
+          // SELLERS dominate below = Bear OB misclassified, very weak as support
+          directionalStrength = (bias * 0.2 + volScore * 0.1) * 0.3;
         }
         break;
         
       case 'ob-bull': // Bull OB above price (buyers dominated)
-        // Strong but slightly less than direct resistance
-        typeScore = volScore * bias * 0.85;
+        // Strong breakout level, buyers won decisively
+        // Weight: 60% directional conviction + 40% volume
+        directionalStrength = (bias * 0.6 + volScore * 0.4) * 0.9;
         break;
         
       case 'ob-bear': // Bear OB below price (sellers dominated)
-        // Strong but slightly less than direct support
-        typeScore = volScore * bias * 0.85;
+        // Strong breakdown level, sellers won decisively
+        // Weight: 60% directional conviction + 40% volume
+        directionalStrength = (bias * 0.6 + volScore * 0.4) * 0.9;
         break;
     }
     
-    lv.overallStrength = typeScore;
+    lv.overallStrength = directionalStrength;
   });
 
   // ── Sort by overall strength (strongest first) ────────────
   classified.sort((a,b) => {
     // Primary: Overall strength score
-    if (Math.abs(b.overallStrength - a.overallStrength) > 0.05) {
+    if (Math.abs(b.overallStrength - a.overallStrength) > 0.02) {
       return b.overallStrength - a.overallStrength;
     }
-    // Secondary: Volume significance (if strength scores are similar)
+    // Secondary: Volume significance (if strength scores are very similar)
     return b.strength - a.strength;
   });
 
