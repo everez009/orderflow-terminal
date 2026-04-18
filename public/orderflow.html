@@ -497,6 +497,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
   <div id="lwc"></div>
   <canvas id="vpc"></canvas>
+  <canvas id="zoneOverlay" style="position:absolute;top:22px;left:70px;pointer-events:none;z-index:5;"></canvas>
   <div class="loading-bar" id="loadingBar">
     <div class="lt" id="loadTxt">FETCHING KLINES...</div>
     <div class="lp"><div class="lpf" id="loadProg" style="width:0%"></div></div>
@@ -2021,6 +2022,10 @@ lwcEl.addEventListener('mouseup', () => {
 let pocLine=null,vahLine=null,valLine=null;
 let premiumLine=null,discountLine=null,equilibriumLine=null;
 let premiumZoneLine=null,discountZoneLine=null;
+
+// Zone area series
+let premiumZoneSeries=null,discountZoneSeries=null,equilibriumZoneSeries=null;
+let lastZoneBars=null;
 function setLine(ref,price,color,title){
   if(ref){try{cs.removePriceLine(ref);}catch(e){}}
   if(price==null)return null;
@@ -2031,6 +2036,7 @@ function resizeChart(){
   const el=document.getElementById('chartWrap');
   lwChart.applyOptions({width:el.clientWidth,height:el.clientHeight-22});
   drawVPC();
+  drawZones();
 }
 window.addEventListener('resize',()=>{
   resizeChart();
@@ -2123,7 +2129,90 @@ function drawVPC(){
     }
   }
 }
-lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{drawVPC();});
+
+// Zone overlay canvas
+const zoneEl=document.getElementById('zoneOverlay');
+const zoneCtx=zoneEl.getContext('2d');
+let lastZoneData=null;
+
+function drawZones(){
+  const el=document.getElementById('chartWrap');
+  const W=el.clientWidth-70;
+  const H=el.clientHeight-22;
+  zoneEl.width=W;zoneEl.height=H;
+  zoneCtx.clearRect(0,0,W,H);
+  
+  const s=ST[activeSym];
+  const tfData=s.cb[activeTF];
+  const barKeys=Object.keys(tfData).map(Number).sort((a,b)=>a-b);
+  if(barKeys.length<20)return;
+  
+  const recentBars=barKeys.slice(-50).map(k=>tfData[k]).filter(b=>b&&b.high&&b.low);
+  if(recentBars.length<10)return;
+  
+  const rangeHigh=Math.max(...recentBars.map(b=>b.high));
+  const rangeLow=Math.min(...recentBars.map(b=>b.low));
+  const range=rangeHigh-rangeLow;
+  if(range<=0)return;
+  
+  const equilibrium=rangeLow+range*0.5;
+  const premium=rangeLow+range*0.618;
+  const discount=rangeLow+range*0.382;
+  const premiumUpper=rangeLow+range*0.786;
+  const discountLower=rangeLow+range*0.214;
+  
+  // Check if zones changed
+  const zoneKey=`${rangeHigh.toFixed(2)}-${rangeLow.toFixed(2)}`;
+  if(lastZoneData===zoneKey)return;
+  lastZoneData=zoneKey;
+  
+  try{
+    // Premium zone (red, 61.8%-78.6%)
+    const pTop=cs.priceToCoordinate(premiumUpper);
+    const pBot=cs.priceToCoordinate(premium);
+    if(pTop!=null&&pBot!=null){
+      const grad=zoneCtx.createLinearGradient(0,pTop,0,pBot);
+      grad.addColorStop(0,'rgba(255,51,85,0.12)');
+      grad.addColorStop(1,'rgba(255,51,85,0.04)');
+      zoneCtx.fillStyle=grad;
+      zoneCtx.fillRect(0,Math.min(pTop,pBot),W,Math.abs(pBot-pTop));
+      zoneCtx.strokeStyle='rgba(255,51,85,0.3)';
+      zoneCtx.lineWidth=0.5;
+      zoneCtx.setLineDash([4,4]);
+      zoneCtx.strokeRect(0,Math.min(pTop,pBot),W,Math.abs(pBot-pTop));
+      zoneCtx.setLineDash([]);
+    }
+    
+    // Discount zone (green, 21.4%-38.2%)
+    const dTop=cs.priceToCoordinate(discount);
+    const dBot=cs.priceToCoordinate(discountLower);
+    if(dTop!=null&&dBot!=null){
+      const grad=zoneCtx.createLinearGradient(0,dTop,0,dBot);
+      grad.addColorStop(0,'rgba(0,255,136,0.12)');
+      grad.addColorStop(1,'rgba(0,255,136,0.04)');
+      zoneCtx.fillStyle=grad;
+      zoneCtx.fillRect(0,Math.min(dTop,dBot),W,Math.abs(dBot-dTop));
+      zoneCtx.strokeStyle='rgba(0,255,136,0.3)';
+      zoneCtx.lineWidth=0.5;
+      zoneCtx.setLineDash([4,4]);
+      zoneCtx.strokeRect(0,Math.min(dTop,dBot),W,Math.abs(dBot-dTop));
+      zoneCtx.setLineDash([]);
+    }
+    
+    // Equilibrium zone (cyan thin band at 50%)
+    const eqTop=cs.priceToCoordinate(equilibrium+range*0.02);
+    const eqBot=cs.priceToCoordinate(equilibrium-range*0.02);
+    if(eqTop!=null&&eqBot!=null){
+      const grad=zoneCtx.createLinearGradient(0,eqTop,0,eqBot);
+      grad.addColorStop(0,'rgba(0,204,255,0.15)');
+      grad.addColorStop(1,'rgba(0,204,255,0.08)');
+      zoneCtx.fillStyle=grad;
+      zoneCtx.fillRect(0,Math.min(eqTop,eqBot),W,Math.abs(eqBot-eqTop));
+    }
+  }catch(e){}
+}
+
+lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{drawVPC();drawZones();});
 
 // ═══════════════════════════════════════════
 // SIGNAL MARKERS ON CHART
@@ -3836,51 +3925,11 @@ function updatePriceLines(){
   vahLine=setLine(vahLine,st.vah,'rgba(0,255,136,.7)','VAH');
   valLine=setLine(valLine,st.val,'rgba(255,51,85,.7)','VAL');
   
-  // ── PREMIUM / DISCOUNT / EQUILIBRIUM ZONES ────────────
-  // Calculate from visible candle range
-  const s=ST[activeSym];
-  const tfData=s.cb[activeTF];
-  const barKeys=Object.keys(tfData).map(Number).sort((a,b)=>a-b);
-  
-  if(barKeys.length>=20){
-    // Use last 50 visible bars for range calculation
-    const recentBars=barKeys.slice(-50).map(k=>tfData[k]).filter(b=>b&&b.high&&b.low);
-    if(recentBars.length>=10){
-      const rangeHigh=Math.max(...recentBars.map(b=>b.high));
-      const rangeLow=Math.min(...recentBars.map(b=>b.low));
-      const range=rangeHigh-rangeLow;
-      
-      if(range>0){
-        // Equilibrium = 50% retracement
-        const equilibrium=rangeLow+range*0.5;
-        // Premium zone = 61.8% (sell zone, expensive)
-        const premium=rangeLow+range*0.618;
-        // Discount zone = 38.2% (buy zone, cheap)
-        const discount=rangeLow+range*0.382;
-        // Outer bounds for visual zones
-        const premiumUpper=rangeLow+range*0.786;
-        const discountLower=rangeLow+range*0.214;
-        
-        // Draw equilibrium line (50% - fair value)
-        equilibriumLine=setLine(equilibriumLine,equilibrium,'rgba(0,204,255,.5)','EQ 50%');
-        
-        // Draw premium zone boundary (61.8% - sell zone)
-        premiumLine=setLine(premiumLine,premium,'rgba(255,51,85,.6)','PREMIUM 61.8%');
-        premiumZoneLine=setLine(premiumZoneLine,premiumUpper,'rgba(255,51,85,.3)','PREMIUM TOP 78.6%');
-        
-        // Draw discount zone boundary (38.2% - buy zone)
-        discountLine=setLine(discountLine,discount,'rgba(0,255,136,.6)','DISCOUNT 38.2%');
-        discountZoneLine=setLine(discountZoneLine,discountLower,'rgba(0,255,136,.3)','DISCOUNT BOT 21.4%');
-      }
-    }
-  } else {
-    // Not enough data - remove zone lines
-    premiumLine=setLine(premiumLine,null,'','');
-    discountLine=setLine(discountLine,null,'','');
-    equilibriumLine=setLine(equilibriumLine,null,'','');
-    premiumZoneLine=setLine(premiumZoneLine,null,'','');
-    discountZoneLine=setLine(discountZoneLine,null,'','');
-  }
+  // ── Remove old zone area series (legacy) ────────────
+  if(premiumZoneSeries){try{lwChart.removeSeries(premiumZoneSeries);}catch(e){}premiumZoneSeries=null;}
+  if(discountZoneSeries){try{lwChart.removeSeries(discountZoneSeries);}catch(e){}discountZoneSeries=null;}
+  if(equilibriumZoneSeries){try{lwChart.removeSeries(equilibriumZoneSeries);}catch(e){}equilibriumZoneSeries=null;}
+  lastZoneBars=null;
   
   // Remove old manual alert lines
   if (window.manualAlertLines) {
