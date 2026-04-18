@@ -2267,12 +2267,20 @@ function addSignalMarker(signal) {
 }
 
 // Add price lines for key levels on chart — only strong ones to avoid clutter
+let lastKeyLevelHash = '';
 function addKeyLevelMarkers(classified) {
   if (!classified || !classified.length) return;
   if (!cs || typeof cs.createPriceLine !== 'function') return;
   
   try {
     const cfg = SYMS[activeSym];
+    const s = ST[activeSym];
+    if (!s || !s.last) return;
+
+    // Create a hash of the current state to avoid unnecessary re-draws
+    const currentHash = classified.map(l => `${l.price.toFixed(cfg.dec)}-${l.overallStrength.toFixed(2)}`).join('|');
+    if (currentHash === lastKeyLevelHash) return;
+    lastKeyLevelHash = currentHash;
     
     // Remove old key level lines
     if (window.keyLevelLines) {
@@ -2283,15 +2291,13 @@ function addKeyLevelMarkers(classified) {
     window.keyLevelLines = [];
     
     // Filter: only levels with high overall strength (>0.45 on the directional+volume scale)
-    // This is stricter than 3-star volume alone — must have conviction too
     const strongLevels = classified.filter(lv => lv.overallStrength > 0.45);
     
     if (!strongLevels.length) return;
     
-    // Limit to max 4 above price (resistance/supply) and 4 below price (support/demand)
-    // to prevent chart clutter
-    const abovePrice = strongLevels.filter(lv => lv.price > ST[activeSym].last);
-    const belowPrice = strongLevels.filter(lv => lv.price <= ST[activeSym].last);
+    // Limit to max 4 above price and 4 below price
+    const abovePrice = strongLevels.filter(lv => lv.price > s.last);
+    const belowPrice = strongLevels.filter(lv => lv.price <= s.last);
     
     const maxPerSide = 4;
     const selected = [
@@ -2299,29 +2305,24 @@ function addKeyLevelMarkers(classified) {
       ...belowPrice.slice(0, maxPerSide)
     ];
     
-    // Also enforce minimum spacing: if two levels are within 0.3% of each other, keep only the stronger one
+    // Enforce minimum spacing: 0.3%
     const spaced = [];
-    const lastPrice = ST[activeSym].last;
     for (const lv of selected) {
-      const tooClose = spaced.some(s => Math.abs(s.price - lv.price) / lastPrice < 0.003);
+      const tooClose = spaced.some(s => Math.abs(s.price - lv.price) / s.last < 0.003);
       if (!tooClose) spaced.push(lv);
     }
     
     // Add price line for each strong, spaced level
     for (const lv of spaced) {
       const isSupport = lv.type === 'sup' || lv.type === 'ob-bull';
-      
-      // Thin, translucent lines so they don't obscure candles
       const color = isSupport ? 'rgba(0,255,136,0.35)' : 'rgba(255,51,85,0.35)';
-      const lineWidth = 1;
-      const lineStyle = LightweightCharts.LineStyle.Dotted;
       
       const line = cs.createPriceLine({
         price: lv.price,
         color: color,
-        lineWidth: lineWidth,
-        lineStyle: lineStyle,
-        axisLabelVisible: false,  // No labels to reduce clutter
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        axisLabelVisible: false,
         title: ''
       });
       
