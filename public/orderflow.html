@@ -2135,11 +2135,14 @@ const zoneEl=document.getElementById('zoneOverlay');
 const zoneCtx=zoneEl.getContext('2d');
 let lastZoneData=null;
 
+console.log(' Zone canvas initialized:', zoneEl);
+
 function drawZones(){
   const el=document.getElementById('chartWrap');
   const W=el.clientWidth;
   const H=el.clientHeight-22;
-  if(W<=0||H<=0)return;
+  console.log('🎨 drawZones called:', {W, H, activeSym, activeTF, zoneEl});
+  if(W<=0||H<=0||!zoneEl){console.log('❌ drawZones early return');return;}
   zoneEl.width=W;zoneEl.height=H;
   zoneCtx.clearRect(0,0,W,H);
   
