@@ -4996,28 +4996,72 @@ function renderHiLiq(){
     classified.push({...lv,type,label,tagStyle,desc,strength,distPct,visits});
   }
 
-  // ── Sort: 3-star first, then by sell% for resistance, buy% for support ────────────
-  classified.sort((a,b)=>{
-    // Primary: 3-star levels first (strength > 0.7)
-    const aThreeStar = a.strength > 0.7 ? 1 : 0;
-    const bThreeStar = b.strength > 0.7 ? 1 : 0;
-    if (bThreeStar !== aThreeStar) return bThreeStar - aThreeStar;
+  // ── Calculate overall strength score for each level ────────────
+  classified.forEach(lv => {
+    let typeScore = 0;
+    let biasScore = 0;
     
-    // Secondary: For resistance/supply (above price), sort by highest sell% (lowest buyRatio)
-    // For support/demand (below price), sort by highest buy%
-    const aAbove = a.price > lastPrice;
-    const bAbove = b.price > lastPrice;
+    // Volume significance (0-1)
+    const volScore = lv.strength;
     
-    if (aAbove && bAbove) {
-      // Both above: sort by lowest buyRatio (highest sell pressure)
-      return a.buyRatio - b.buyRatio;
-    } else if (!aAbove && !bAbove) {
-      // Both below: sort by highest buyRatio (highest buy pressure)
-      return b.buyRatio - a.buyRatio;
-    } else {
-      // Mixed: keep original strength order
-      return b.strength - a.strength;
+    // Directional bias strength (how extreme the buy/sell ratio is)
+    // Perfect bias = 0 or 1, balanced = 0.5
+    const bias = Math.abs(lv.buyRatio - 0.5) * 2; // 0 to 1 scale
+    
+    // Type-specific scoring:
+    // RESISTANCE (above + sell dominates): strength = volScore * bias (higher when sell% > 55%)
+    // SUPPORT (below + buy dominates): strength = volScore * bias (higher when buy% > 55%)
+    // SUPPLY (above + balanced): strength = volScore * (1 - bias) * 0.7 (penalize balanced)
+    // DEMAND (below + balanced): strength = volScore * (1 - bias) * 0.7
+    // BULL OB (above + buy dominates): strength = volScore * bias * 0.9 (slightly penalize for being above)
+    // BEAR OB (below + sell dominates): strength = volScore * bias * 0.9
+    
+    const isAbove = lv.price > lastPrice;
+    const buyPct = lv.buyRatio;
+    
+    switch(lv.type) {
+      case 'res': // RESISTANCE or SUPPLY above price
+        if (buyPct < 0.45) {
+          // Strong resistance: sellers dominate above
+          typeScore = volScore * bias * 1.0;
+        } else {
+          // Balanced supply: penalize for lack of clear bias
+          typeScore = volScore * (1 - bias) * 0.6;
+        }
+        break;
+        
+      case 'sup': // SUPPORT or DEMAND below price
+        if (buyPct > 0.55) {
+          // Strong support: buyers dominate below
+          typeScore = volScore * bias * 1.0;
+        } else {
+          // Balanced demand: penalize for lack of clear bias
+          typeScore = volScore * (1 - bias) * 0.6;
+        }
+        break;
+        
+      case 'ob-bull': // Bull OB above price (buyers dominated)
+        // Strong but slightly less than direct resistance
+        typeScore = volScore * bias * 0.85;
+        break;
+        
+      case 'ob-bear': // Bear OB below price (sellers dominated)
+        // Strong but slightly less than direct support
+        typeScore = volScore * bias * 0.85;
+        break;
     }
+    
+    lv.overallStrength = typeScore;
+  });
+
+  // ── Sort by overall strength (strongest first) ────────────
+  classified.sort((a,b) => {
+    // Primary: Overall strength score
+    if (Math.abs(b.overallStrength - a.overallStrength) > 0.05) {
+      return b.overallStrength - a.overallStrength;
+    }
+    // Secondary: Volume significance (if strength scores are similar)
+    return b.strength - a.strength;
   });
 
   document.getElementById('hiLiqCnt').textContent=classified.length;
