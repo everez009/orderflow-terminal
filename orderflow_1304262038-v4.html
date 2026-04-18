@@ -497,7 +497,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
   <div id="lwc"></div>
   <canvas id="vpc"></canvas>
-  <canvas id="zoneOverlay" style="position:absolute;top:22px;left:70px;pointer-events:none;z-index:5;"></canvas>
+  <canvas id="zoneOverlay" style="position:absolute;top:22px;left:0;right:70px;bottom:0;pointer-events:none;z-index:15;"></canvas>
   <div class="loading-bar" id="loadingBar">
     <div class="lt" id="loadTxt">FETCHING KLINES...</div>
     <div class="lp"><div class="lpf" id="loadProg" style="width:0%"></div></div>
@@ -2139,6 +2139,7 @@ function drawZones(){
   const el=document.getElementById('chartWrap');
   const W=el.clientWidth-70;
   const H=el.clientHeight-22;
+  if(W<=0||H<=0)return;
   zoneEl.width=W;zoneEl.height=H;
   zoneCtx.clearRect(0,0,W,H);
   
@@ -2167,47 +2168,68 @@ function drawZones(){
   lastZoneData=zoneKey;
   
   try{
-    // Premium zone (red, 61.8%-78.6%)
+    // Premium zone (red, 61.8%-78.6%) - SELL ZONE
     const pTop=cs.priceToCoordinate(premiumUpper);
     const pBot=cs.priceToCoordinate(premium);
     if(pTop!=null&&pBot!=null){
-      const grad=zoneCtx.createLinearGradient(0,pTop,0,pBot);
-      grad.addColorStop(0,'rgba(255,51,85,0.12)');
-      grad.addColorStop(1,'rgba(255,51,85,0.04)');
+      const y1=Math.min(pTop,pBot);
+      const y2=Math.max(pTop,pBot);
+      const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
+      grad.addColorStop(0,'rgba(255,51,85,0.20)');
+      grad.addColorStop(1,'rgba(255,51,85,0.08)');
       zoneCtx.fillStyle=grad;
-      zoneCtx.fillRect(0,Math.min(pTop,pBot),W,Math.abs(pBot-pTop));
-      zoneCtx.strokeStyle='rgba(255,51,85,0.3)';
-      zoneCtx.lineWidth=0.5;
-      zoneCtx.setLineDash([4,4]);
-      zoneCtx.strokeRect(0,Math.min(pTop,pBot),W,Math.abs(pBot-pTop));
+      zoneCtx.fillRect(0,y1,W,y2-y1);
+      zoneCtx.strokeStyle='rgba(255,51,85,0.5)';
+      zoneCtx.lineWidth=1;
+      zoneCtx.setLineDash([6,4]);
+      zoneCtx.strokeRect(0,y1,W,y2-y1);
       zoneCtx.setLineDash([]);
+      // Label
+      zoneCtx.fillStyle='rgba(255,51,85,0.8)';
+      zoneCtx.font='Bold 9px Share Tech Mono';
+      zoneCtx.textAlign='right';
+      zoneCtx.fillText('▓ PREMIUM ▓',W-4,y1+12);
     }
     
-    // Discount zone (green, 21.4%-38.2%)
+    // Discount zone (green, 21.4%-38.2%) - BUY ZONE
     const dTop=cs.priceToCoordinate(discount);
     const dBot=cs.priceToCoordinate(discountLower);
     if(dTop!=null&&dBot!=null){
-      const grad=zoneCtx.createLinearGradient(0,dTop,0,dBot);
-      grad.addColorStop(0,'rgba(0,255,136,0.12)');
-      grad.addColorStop(1,'rgba(0,255,136,0.04)');
+      const y1=Math.min(dTop,dBot);
+      const y2=Math.max(dTop,dBot);
+      const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
+      grad.addColorStop(0,'rgba(0,255,136,0.20)');
+      grad.addColorStop(1,'rgba(0,255,136,0.08)');
       zoneCtx.fillStyle=grad;
-      zoneCtx.fillRect(0,Math.min(dTop,dBot),W,Math.abs(dBot-dTop));
-      zoneCtx.strokeStyle='rgba(0,255,136,0.3)';
-      zoneCtx.lineWidth=0.5;
-      zoneCtx.setLineDash([4,4]);
-      zoneCtx.strokeRect(0,Math.min(dTop,dBot),W,Math.abs(dBot-dTop));
+      zoneCtx.fillRect(0,y1,W,y2-y1);
+      zoneCtx.strokeStyle='rgba(0,255,136,0.5)';
+      zoneCtx.lineWidth=1;
+      zoneCtx.setLineDash([6,4]);
+      zoneCtx.strokeRect(0,y1,W,y2-y1);
       zoneCtx.setLineDash([]);
+      // Label
+      zoneCtx.fillStyle='rgba(0,255,136,0.8)';
+      zoneCtx.font='Bold 9px Share Tech Mono';
+      zoneCtx.textAlign='right';
+      zoneCtx.fillText('▓ DISCOUNT ▓',W-4,y1+12);
     }
     
     // Equilibrium zone (cyan thin band at 50%)
     const eqTop=cs.priceToCoordinate(equilibrium+range*0.02);
     const eqBot=cs.priceToCoordinate(equilibrium-range*0.02);
     if(eqTop!=null&&eqBot!=null){
-      const grad=zoneCtx.createLinearGradient(0,eqTop,0,eqBot);
-      grad.addColorStop(0,'rgba(0,204,255,0.15)');
-      grad.addColorStop(1,'rgba(0,204,255,0.08)');
+      const y1=Math.min(eqTop,eqBot);
+      const y2=Math.max(eqTop,eqBot);
+      const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
+      grad.addColorStop(0,'rgba(0,204,255,0.25)');
+      grad.addColorStop(1,'rgba(0,204,255,0.12)');
       zoneCtx.fillStyle=grad;
-      zoneCtx.fillRect(0,Math.min(eqTop,eqBot),W,Math.abs(eqBot-eqTop));
+      zoneCtx.fillRect(0,y1,W,y2-y1);
+      // Label
+      zoneCtx.fillStyle='rgba(0,204,255,0.8)';
+      zoneCtx.font='Bold 9px Share Tech Mono';
+      zoneCtx.textAlign='right';
+      zoneCtx.fillText('▓ EQ 50% ▓',W-4,y1+10);
     }
   }catch(e){}
 }
