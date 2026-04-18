@@ -4381,10 +4381,30 @@ async function generateSignal() {
     const bidWalls = Object.entries(orderBook.bids || {}).map(([p, sz]) => ({ price: parseFloat(p), size: parseFloat(sz) })).filter(w => w.size > 0).slice(0, 5);
     const askWalls = Object.entries(orderBook.asks || {}).map(([p, sz]) => ({ price: parseFloat(p), size: parseFloat(sz) })).filter(w => w.size > 0).slice(0, 5);
     const marketData = { symbol: activeSym, currentPrice: s.last, volumeProfile: { poc, vah, val }, footprint: { delta: totalDelta }, orderBook: { bidWalls, askWalls } };
+    console.log('📤 Market data sent to AI:', marketData);
     const response = await fetch('/api/generate-signal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: activeSym, marketData }) });
     if (!response.ok) throw new Error(`API error: ${response.status}`);
     const signal = await response.json();
-    alert(`${signal.signal} ${signal.conviction}\nScore: ${signal.score}/10\nEntry: $${signal.entry_zone?.price?.toFixed(2)}\nStop: $${signal.stop_loss?.price?.toFixed(2)}\nTP1: $${signal.targets?.tp1?.toFixed(2)}\nR:R: ${signal.rr_ratio?.toFixed(2)}\n\n${signal.primary_reason}`);
+    console.log('Full signal response:', signal);
+    
+    let alertMsg = `${signal.signal} | ${signal.conviction} CONVICTION\nScore: ${signal.score}/10\n\n`;
+    
+    if (signal.signal === 'FLAT') {
+      alertMsg += `No trade signal at this time.\n\n${signal.primary_reason || signal.institutional_narrative || 'Awaiting better setup.'}`;
+    } else {
+      alertMsg += `Entry: $${signal.entry_zone?.price?.toLocaleString() || 'N/A'}\n`;
+      alertMsg += `Stop: $${signal.stop_loss?.price?.toLocaleString() || 'N/A'}\n`;
+      alertMsg += `TP1: $${signal.targets?.tp1?.toLocaleString() || 'N/A'}\n`;
+      alertMsg += `TP2: $${signal.targets?.tp2?.toLocaleString() || 'N/A'}\n`;
+      alertMsg += `TP3: $${signal.targets?.tp3?.toLocaleString() || 'N/A'}\n`;
+      alertMsg += `R:R Ratio: ${signal.rr_ratio?.toFixed(2) || 'N/A'}\n\n`;
+      alertMsg += `Reason: ${signal.primary_reason || 'N/A'}\n\n`;
+      if (signal.institutional_narrative) {
+        alertMsg += `Analysis: ${signal.institutional_narrative}`;
+      }
+    }
+    
+    alert(alertMsg);
   } catch (error) {
     console.error('❌ Signal failed:', error);
     alert(`Failed: ${error.message}`);
