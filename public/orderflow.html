@@ -4235,7 +4235,7 @@ function drawFPChart(){
 // ═══════════════════════════════════════════
 let rPend=false,fpPend=false,hmPend=false;
 function schedRender(){
-  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();updatePriceLines();});}
+  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();drawZones();updatePriceLines();});}
   if(viewMode===1&&!fpPend){fpPend=true;requestAnimationFrame(()=>{fpPend=false;drawFPChart();});}
 }
 function renderAll(){renderPB();renderVP();renderHiLiq();updateThresh();evalSignal();}
@@ -4347,7 +4347,7 @@ setInterval(()=>{
   updateMomentumGauge();
 
   // Redraw all panels — 1s cadence is plenty for UI freshness
-  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();updatePriceLines();});}
+  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();drawZones();updatePriceLines();});}
 },1000);
 
 // ═══════════════════════════════════════════════════════════════
