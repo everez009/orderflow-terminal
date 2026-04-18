@@ -81,7 +81,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .noal{color:var(--dim);font-size:.95em;letter-spacing:2px;padding:0 12px;}
 
 /* CHART AREA */
-.chart-wrap{position:relative;background:var(--bg);flex-shrink:0;height:280px;}
+.chart-wrap{position:relative;background:var(--bg);flex-shrink:0;height:360px;}
 .chdr{position:absolute;top:0;left:0;right:0;padding:4px 10px;background:rgba(4,8,14,.97);border-bottom:1px solid var(--border);font-family:var(--disp);font-size:.73em;letter-spacing:2px;color:var(--cdim);display:flex;justify-content:space-between;align-items:center;z-index:20;pointer-events:none;}
 .leg{display:flex;gap:8px;align-items:center;font-size:.64em;}
 .bdg{font-size:.64em;padding:1px 4px;border-radius:2px;background:rgba(0,204,255,.1);color:var(--cdim);border:1px solid rgba(0,204,255,.2);}
@@ -93,7 +93,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .loading-bar .lpf{height:100%;background:var(--green);border-radius:2px;transition:width .3s;}
 
 /* FOOTPRINT CHART */
-.fp-chart-wrap{position:relative;background:var(--bg);flex-shrink:0;height:280px;overflow:hidden;}
+.fp-chart-wrap{position:relative;background:var(--bg);flex-shrink:0;height:360px;overflow:hidden;}
 .fp-chart-hdr{position:absolute;top:0;left:0;right:0;padding:4px 10px;background:rgba(4,8,14,.97);border-bottom:1px solid var(--border);font-family:var(--disp);font-size:.73em;letter-spacing:2px;color:var(--cdim);display:flex;justify-content:space-between;align-items:center;z-index:20;}
 #fpChart{position:absolute;top:22px;left:0;right:0;bottom:0;cursor:crosshair;}
 #hmCanvas{position:absolute;top:22px;left:0;right:0;bottom:0;}
@@ -312,11 +312,11 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   .cbot{font-size:.7em;}
   
   /* Charts - Reduced height */
-  .chart-wrap{height:240px !important;}
+  .chart-wrap{height:300px !important;}
   .chdr{font-size:.75em;padding:3px 8px;}
   .leg{gap:4px;font-size:.7em;}
   #vpc{width:50px;}
-  .fp-chart-wrap{height:240px !important;}
+  .fp-chart-wrap{height:300px !important;}
   .fp-chart-hdr{font-size:.75em;padding:3px 8px;}
   
   /* Panels - Stack vertically with collapsible headers */
@@ -372,8 +372,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   .mode-btn{padding:3px 6px;font-size:.7em;}
   .tfb{padding:2px 6px;font-size:.75em;}
   .pbar{grid-template-columns:repeat(2,1fr);}
-  .chart-wrap{height:200px !important;}
-  .fp-chart-wrap{height:200px !important;}
+  .chart-wrap{height:260px !important;}
+  .fp-chart-wrap{height:260px !important;}
   .panel{margin-bottom:6px;}
   .pb{max-height:300px;}
   .sigbar{padding:3px 8px;}
@@ -386,8 +386,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   .hdr{padding:4px 10px;}
   .title{font-size:.75em;}
   .ctrl{padding:3px 8px;}
-  .chart-wrap{height:180px !important;}
-  .fp-chart-wrap{height:180px !important;}
+  .chart-wrap{height:240px !important;}
+  .fp-chart-wrap{height:240px !important;}
   .panel{max-height:25vh;}
   .abar{display:none;}
 }
@@ -435,7 +435,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     <button class="ibtn" onclick="cycleFontSize()">Aa</button>
     <button class="ibtn" id="htfBiasBtn" onclick="toggleHTFBias()" title="Higher Timeframe Bias Filter">📊 HTF OFF</button>
     <button class="ibtn" onclick="openSettings()">⚙ ALERTS</button>
-    <button class="ibtn" id="wakeLockBtn" onclick="toggleWakeLock()" title="Keep screen awake (mobile)">🔒 AWAKE</button>
     <button class="ibtn" onclick="resetSession()" title="Reset session volume profile">🔄 RESET</button>
   </div>
 </div>
@@ -451,9 +450,15 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     <div class="pl">SESSION VOL <span id="sessionBadge" style="font-size:.7em;color:var(--cdim)"></span></div>
     <div class="pv nt" id="pVol">0</div>
   </div>
-  <div class="pc" title="Momentum score: -100 (bearish) to +100 (bullish)">
-    <div class="pl">MOMENTUM</div>
-    <div class="pv nt" id="pMomentum" style="font-weight:bold">0</div>
+  <div class="pc" title="Momentum score: -100 (bearish) to +100 (bullish)" style="display:flex;flex-direction:column;justify-content:center;">
+    <div class="pl" style="margin-bottom:3px;">MOMENTUM</div>
+    <div style="display:flex;align-items:center;gap:5px;">
+      <div style="flex:1;height:10px;background:var(--bg);border-radius:2px;border:1px solid var(--border);position:relative;overflow:hidden;">
+        <div style="position:absolute;left:50%;top:0;width:1px;height:100%;background:var(--white);z-index:1;"></div>
+        <div class="mom-bar-fill" id="momBarFill" style="transition:all .3s ease;border-radius:1px;"></div>
+      </div>
+      <div class="pv nt" id="pMomentum" style="font-weight:bold;min-width:35px;text-align:center;font-size:.9em;">0</div>
+    </div>
   </div>
 </div>
 
@@ -465,16 +470,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
   </div>
   <div class="sig-conditions" id="sigConditions"></div>
   <div class="sig-meta" id="sigMeta"></div>
-</div>
-
-<!-- MOMENTUM GAUGE -->
-<div class="mom-gauge" id="momGauge" style="display:none;">
-  <span class="mom-label">MOMENTUM</span>
-  <div class="mom-bar-container">
-    <div class="mom-bar-fill" id="momBarFill"></div>
-    <div class="mom-center"></div>
-  </div>
-  <span class="mom-score neutral" id="momScore">0</span>
 </div>
 
 <!-- ALERT BAR -->
@@ -4150,29 +4145,27 @@ function schedRender(){
 function renderAll(){renderPB();renderVP();renderHiLiq();updateThresh();evalSignal();}
 
 // MOMENTUM GAUGE UPDATE
-// Updates the visual momentum bar in real-time
+// Updates the visual momentum bar in real-time (inline in price bar)
 function updateMomentumGauge() {
   const s = ST[activeSym];
   const rt = s.runTracker;
-  const gauge = document.getElementById('momGauge');
   const barFill = document.getElementById('momBarFill');
-  const scoreEl = document.getElementById('momScore');
+  const scoreEl = document.getElementById('pMomentum');
   
-  if (!gauge || !barFill || !scoreEl) return;
+  if (!barFill || !scoreEl) return;
   
-  // Show gauge only after we have enough data
+  // Show bar only after we have enough data
   if (rt.priceHistory.length < 5) {
-    gauge.style.display = 'none';
+    barFill.style.width = '0%';
     return;
   }
   
-  gauge.style.display = 'flex';
   const score = rt.momentumScore;
   const absScore = Math.abs(score);
   
   // Update score text
   scoreEl.textContent = (score > 0 ? '+' : '') + score.toFixed(0);
-  scoreEl.className = 'mom-score ' + (score > 20 ? 'bullish' : score < -20 ? 'bearish' : 'neutral');
+  scoreEl.style.color = score > 20 ? 'var(--green)' : score < -20 ? 'var(--red)' : 'var(--amber)';
   
   // Update bar fill
   barFill.className = 'mom-bar-fill ' + (score > 0 ? 'bullish' : 'bearish');
@@ -4180,14 +4173,7 @@ function updateMomentumGauge() {
   // Calculate width (0-50% of container, centered)
   const widthPct = (absScore / 100) * 50;
   barFill.style.width = widthPct + '%';
-  
-  // Add glow effect for high momentum
-  if (absScore > 60) {
-    const color = score > 0 ? 'rgba(0,255,136,' : 'rgba(255,51,85,';
-    gauge.style.boxShadow = `0 0 ${absScore/10}px ${color}${absScore/200})`;
-  } else {
-    gauge.style.boxShadow = 'none';
-  }
+  barFill.style.display = 'block';
 }
 
 // ── HEARTBEAT ─────────────────────────────────────────────────
