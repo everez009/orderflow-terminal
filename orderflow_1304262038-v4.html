@@ -2290,8 +2290,8 @@ function addKeyLevelMarkers(classified) {
     }
     window.keyLevelLines = [];
     
-    // Filter: only levels with high overall strength (>0.45 on the directional+volume scale)
-    const strongLevels = classified.filter(lv => lv.overallStrength > 0.45);
+    // Filter: only levels with moderate overall strength (>0.25 on the directional+volume scale)
+    const strongLevels = classified.filter(lv => lv.overallStrength > 0.25);
     
     if (!strongLevels.length) return;
     
@@ -5027,8 +5027,8 @@ function renderHiLiq(){
     // Skip levels too far away (>8% - increased from 5% for better coverage)
     if(distPct>8) continue;
 
-    // Only show levels with 2x institutional strength (strength >= 0.5)
-    if(strength < 0.5) continue;
+    // Only show levels with 1.5x institutional strength (strength >= 0.3) to ensure we have some lines
+    if(strength < 0.3) continue;
 
     let type=null, label='', tagStyle='', desc='';
 
