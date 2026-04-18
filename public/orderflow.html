@@ -4355,6 +4355,14 @@ let lastSignalTime=0;
 let currentTradeDir = 'buy'; // Track current trade direction for risk calculator
 const SIGNAL_COOLDOWN=120000; // 2 min minimum between same-direction signals
 
+// Institutional Enhancement: Signal persistence tracking
+// Requires conditions to hold for N consecutive checks before firing
+let signalPersistence = { buy: 0, sell: 0, lastCheck: 0 };
+const SIGNAL_PERSISTENCE_REQUIRED = 2; // Must pass 2 consecutive checks
+
+// Institutional Enhancement: Absorption detection
+let lastAbsorptionCheck = { bid: 0, ask: 0, price: 0 };
+
 // AI SIGNAL GENERATION (Phase 2)
 async function generateSignal() {
   const btn = document.getElementById('signalBtn');
@@ -4458,13 +4466,36 @@ function evalSignal(){
   // ── CONDITION 4: Footprint delta (last 3 bars) ────────────────
   const fpBars=Object.values(s.fp).sort((a,b)=>b.ts-a.ts).slice(0,3);
   let fpBuyDelta=0, fpSellDelta=0, fpImbalanceBuy=false, fpImbalanceSell=false;
+  let absLastBar=null;
   for(const b of fpBars){
     const d=b.buy-b.sell; const tot=b.buy+b.sell||0.001;
     if(d>0) fpBuyDelta+=d; else fpSellDelta+=Math.abs(d);
     const imb=Math.abs(b.buy-b.sell)/tot;
     if(imb>0.65&&b.buy>b.sell) fpImbalanceBuy=true;
     if(imb>0.65&&b.sell>b.buy) fpImbalanceSell=true;
+    if(!absLastBar) absLastBar=b;
   }
+  
+  // Institutional Enhancement: Absorption Detection
+  // Price held but aggressive delta occurred = absorption
+  let absorptionDetected = false;
+  if(absLastBar) {
+    const lastBar = absLastBar;
+    const deltaMagnitude = Math.abs(lastBar.buy - lastBar.sell);
+    const avgBarVol = (lastBar.buy + lastBar.sell) / 2;
+    // Large delta but price didn't move much = absorption
+    if(deltaMagnitude > avgBarVol * 1.5 && s.last && Math.abs(s.last - (lastBar.open||lastBar.close||s.last)) < cfg.dynBucket*2) {
+      absorptionDetected = true;
+      if(lastBar.sell > lastBar.buy && atSupport) {
+        // Sellers absorbed at support = bullish
+        fpBuyDelta += deltaMagnitude * 0.5; // Boost bullish score
+      } else if(lastBar.buy > lastBar.sell && atResistance) {
+        // Buyers absorbed at resistance = bearish
+        fpSellDelta += deltaMagnitude * 0.5; // Boost bearish score
+      }
+    }
+  }
+  
   const fpBullish=fpBuyDelta>fpSellDelta||fpImbalanceBuy;
   const fpBearish=fpSellDelta>fpBuyDelta||fpImbalanceSell;
 
@@ -4564,8 +4595,78 @@ function evalSignal(){
   }
 
   // Need both required conditions + mode-specific optional count
-  const buySignal=buyScore.reqPass&&buyScore.score>=optionalRequired;
-  const sellSignal=sellScore.reqPass&&sellScore.score>=optionalRequired;
+  let buySignal=buyScore.reqPass&&buyScore.score>=optionalRequired;
+  let sellSignal=sellScore.reqPass&&sellScore.score>=optionalRequired;
+
+  // ── INSTITUTIONAL ENHANCEMENT: Signal Persistence ─────────────
+  // Signals must hold for 2+ consecutive checks (filters false positives)
+  const now2=Date.now();
+  if(now2 - signalPersistence.lastCheck < 3000) { // Check every 3 seconds
+    if(buySignal) signalPersistence.buy++;
+    else signalPersistence.buy = 0;
+    if(sellSignal) signalPersistence.sell++;
+    else signalPersistence.sell = 0;
+  }
+  signalPersistence.lastCheck = now2;
+  
+  // Require 2 consecutive passes before firing
+  if(signalPersistence.buy < SIGNAL_PERSISTENCE_REQUIRED) buySignal = false;
+  if(signalPersistence.sell < SIGNAL_PERSISTENCE_REQUIRED) sellSignal = false;
+  
+  // ── INSTITUTIONAL ENHANCEMENT: Delta Divergence Filter ────────
+  // Price lower low + delta higher low = hidden strength (bullish)
+  // Price higher high + delta lower high = exhaustion (bearish)
+  if(s.fp && Object.keys(s.fp).length > 12) {
+    const sortedBars = Object.values(s.fp).sort((a,b) => b.ts - a.ts);
+    const recent3 = sortedBars.slice(0, 3);
+    const older3 = sortedBars.slice(6, 9);
+    
+    if(recent3.length && older3.length) {
+      const recentLow = Math.min(...recent3.map(b => b.low || price));
+      const olderLow = Math.min(...older3.map(b => b.low || price));
+      const recentHigh = Math.max(...recent3.map(b => b.high || price));
+      const olderHigh = Math.max(...older3.map(b => b.high || price));
+      
+      const recentDelta = recent3.reduce((sum, b) => sum + (b.buy - b.sell), 0);
+      const olderDelta = older3.reduce((sum, b) => sum + (b.buy - b.sell), 0);
+      
+      // Bullish divergence: price lower low, delta higher low
+      if(recentLow < olderLow && recentDelta > olderDelta && atSupport) {
+        buyScore.score += 1; // Boost score
+      }
+      // Bearish divergence: price higher high, delta lower high
+      if(recentHigh > olderHigh && recentDelta < olderDelta && atResistance) {
+        sellScore.score += 1; // Boost score
+      }
+    }
+  }
+  
+  // ── INSTITUTIONAL ENHANCEMENT: Volume Confirmation ────────────
+  // Signals with expanding volume are higher quality
+  if(s.fp && Object.keys(s.fp).length > 6) {
+    const sortedBars = Object.values(s.fp).sort((a,b) => b.ts - a.ts);
+    const recentVol = sortedBars.slice(0, 3).reduce((sum, b) => sum + b.buy + b.sell, 0);
+    const olderVol = sortedBars.slice(3, 6).reduce((sum, b) => sum + b.buy + b.sell, 0);
+    const volExpansion = recentVol > olderVol * 1.2; // 20% expansion
+    
+    if(volExpansion) {
+      // Boost score when volume confirms signal
+      if(buySignal) buyScore.score += 1;
+      if(sellSignal) sellScore.score += 1;
+    }
+  }
+  
+  // ── INSTITUTIONAL ENHANCEMENT: Time Filter ────────────────────
+  // Avoid trading during low liquidity hours (UTC)
+  const utcHour = new Date().getUTCHours();
+  const lowLiquidityHours = [22, 23, 0, 1, 2, 3]; // 10pm-3am UTC = low liquidity
+  const isLowLiquidity = lowLiquidityHours.includes(utcHour);
+  
+  if(isLowLiquidity) {
+    // Increase threshold during low liquidity
+    if(buyScore.score < optionalRequired + 2) buySignal = false;
+    if(sellScore.score < optionalRequired + 2) sellSignal = false;
+  }
 
   // Stars (1-5): 2 optional = 1★, 3=2★★, 4=3★★★, 5=4★★★★, all=5★★★★★
   const stars=(score,total)=>{
