@@ -2142,16 +2142,23 @@ function drawZones(){
   const W=el.clientWidth;
   const H=el.clientHeight-22;
   console.log('🎨 drawZones called:', {W, H, activeSym, activeTF, zoneEl});
-  if(W<=0||H<=0||!zoneEl){console.log('❌ drawZones early return');return;}
+  if(W<=0||H<=0||!zoneEl){console.log('❌ drawZones early return - dimensions');return;}
   zoneEl.width=W;zoneEl.height=H;
   zoneCtx.clearRect(0,0,W,H);
   
+  // TEST: Draw a red rectangle at top-left to verify canvas is working
+  zoneCtx.fillStyle='rgba(255,0,0,0.3)';
+  zoneCtx.fillRect(0,0,100,50);
+  zoneCtx.fillStyle='white';
+  zoneCtx.font='Bold 14px monospace';
+  zoneCtx.fillText('CANVAS OK',10,30);
+  
   const s=ST[activeSym];
-  if(!s||!s.cb)return;
+  if(!s||!s.cb){console.log('❌ No state or chart data');return;}
   const tfData=s.cb[activeTF];
-  if(!tfData)return;
+  if(!tfData){console.log('❌ No timeframe data for',activeTF);return;}
   const barKeys=Object.keys(tfData).map(Number).sort((a,b)=>a-b);
-  if(barKeys.length<20)return;
+  if(barKeys.length<20){console.log('❌ Not enough bars:',barKeys.length);return;}
   
   const recentBars=barKeys.slice(-50).map(k=>tfData[k]).filter(b=>b&&b.high&&b.low);
   if(recentBars.length<10)return;
