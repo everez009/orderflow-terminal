@@ -2036,7 +2036,7 @@ function resizeChart(){
   const el=document.getElementById('chartWrap');
   lwChart.applyOptions({width:el.clientWidth,height:el.clientHeight-22});
   drawVPC();
-  drawZones();
+  updateZoneLines();
 }
 window.addEventListener('resize',()=>{
   resizeChart();
@@ -2130,35 +2130,25 @@ function drawVPC(){
   }
 }
 
-// Zone overlay canvas
+// Zone overlay canvas (replaced with price lines)
+// Kept for reference but no longer used
 const zoneEl=document.getElementById('zoneOverlay');
-const zoneCtx=zoneEl.getContext('2d');
+const zoneCtx=zoneEl?zoneEl.getContext('2d'):null;
 let lastZoneData=null;
 
-console.log(' Zone canvas initialized:', zoneEl);
+// ═══════════════════════════════════════════
+// ZONE LINES (using LightweightCharts price lines)
+// ═══════════════════════════════════════════
+let zoneLines={premiumUpper:null,premium:null,discount:null,discountLower:null,equilibrium:null};
+let lastZonePrices=null;
 
-function drawZones(){
-  const el=document.getElementById('chartWrap');
-  const W=el.clientWidth;
-  const H=el.clientHeight-22;
-  console.log('🎨 drawZones called:', {W, H, activeSym, activeTF, zoneEl});
-  if(W<=0||H<=0||!zoneEl){console.log('❌ drawZones early return - dimensions');return;}
-  zoneEl.width=W;zoneEl.height=H;
-  zoneCtx.clearRect(0,0,W,H);
-  
-  // TEST: Draw a red rectangle at top-left to verify canvas is working
-  zoneCtx.fillStyle='rgba(255,0,0,0.3)';
-  zoneCtx.fillRect(0,0,100,50);
-  zoneCtx.fillStyle='white';
-  zoneCtx.font='Bold 14px monospace';
-  zoneCtx.fillText('CANVAS OK',10,30);
-  
+function updateZoneLines(){
   const s=ST[activeSym];
-  if(!s||!s.cb){console.log('❌ No state or chart data');return;}
+  if(!s||!s.cb)return;
   const tfData=s.cb[activeTF];
-  if(!tfData){console.log('❌ No timeframe data for',activeTF);return;}
+  if(!tfData)return;
   const barKeys=Object.keys(tfData).map(Number).sort((a,b)=>a-b);
-  if(barKeys.length<20){console.log('❌ Not enough bars:',barKeys.length);return;}
+  if(barKeys.length<20)return;
   
   const recentBars=barKeys.slice(-50).map(k=>tfData[k]).filter(b=>b&&b.high&&b.low);
   if(recentBars.length<10)return;
@@ -2174,91 +2164,39 @@ function drawZones(){
   const premiumUpper=rangeLow+range*0.786;
   const discountLower=rangeLow+range*0.214;
   
-  // Debug: log zone coordinates
-  console.log('🎯 ZONES:', {rangeHigh, rangeLow, range, premium, discount, equilibrium});
-  
-  // Check if zones changed
   const zoneKey=`${rangeHigh.toFixed(2)}-${rangeLow.toFixed(2)}`;
-  if(lastZoneData===zoneKey)return;
-  lastZoneData=zoneKey;
+  if(lastZonePrices===zoneKey)return;
+  lastZonePrices=zoneKey;
   
-  try{
-    // Premium zone (red, 61.8%-78.6%) - SELL ZONE
-    const pTop=cs.priceToCoordinate(premiumUpper);
-    const pBot=cs.priceToCoordinate(premium);
-    console.log('🔴 Premium coords:', {premiumUpper, premium, pTop, pBot});
-    if(pTop!=null&&pBot!=null){
-      const y1=Math.min(pTop,pBot);
-      const y2=Math.max(pTop,pBot);
-      const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
-      grad.addColorStop(0,'rgba(255,51,85,0.50)');
-      grad.addColorStop(0.5,'rgba(255,51,85,0.35)');
-      grad.addColorStop(1,'rgba(255,51,85,0.20)');
-      zoneCtx.fillStyle=grad;
-      zoneCtx.fillRect(0,y1,W,y2-y1);
-      zoneCtx.strokeStyle='rgba(255,51,85,1)';
-      zoneCtx.lineWidth=2;
-      zoneCtx.setLineDash([8,4]);
-      zoneCtx.strokeRect(0,y1,W,y2-y1);
-      zoneCtx.setLineDash([]);
-      // Label
-      zoneCtx.fillStyle='rgba(255,51,85,1)';
-      zoneCtx.font='Bold 11px Share Tech Mono';
-      zoneCtx.textAlign='right';
-      zoneCtx.fillText('▓ PREMIUM ▓',W-8,y1+14);
-    }
-    
-    // Discount zone (green, 21.4%-38.2%) - BUY ZONE
-    const dTop=cs.priceToCoordinate(discount);
-    const dBot=cs.priceToCoordinate(discountLower);
-    console.log('🟢 Discount coords:', {discount, discountLower, dTop, dBot});
-    if(dTop!=null&&dBot!=null){
-      const y1=Math.min(dTop,dBot);
-      const y2=Math.max(dTop,dBot);
-      const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
-      grad.addColorStop(0,'rgba(0,255,136,0.50)');
-      grad.addColorStop(0.5,'rgba(0,255,136,0.35)');
-      grad.addColorStop(1,'rgba(0,255,136,0.20)');
-      zoneCtx.fillStyle=grad;
-      zoneCtx.fillRect(0,y1,W,y2-y1);
-      zoneCtx.strokeStyle='rgba(0,255,136,1)';
-      zoneCtx.lineWidth=2;
-      zoneCtx.setLineDash([8,4]);
-      zoneCtx.strokeRect(0,y1,W,y2-y1);
-      zoneCtx.setLineDash([]);
-      // Label
-      zoneCtx.fillStyle='rgba(0,255,136,1)';
-      zoneCtx.font='Bold 11px Share Tech Mono';
-      zoneCtx.textAlign='right';
-      zoneCtx.fillText('▓ DISCOUNT ',W-8,y1+14);
-    }
-    
-    // Equilibrium zone (cyan thin band at 50%)
-    const eqTop=cs.priceToCoordinate(equilibrium+range*0.02);
-    const eqBot=cs.priceToCoordinate(equilibrium-range*0.02);
-    console.log('🔵 EQ coords:', {equilibrium, eqTop, eqBot});
-    if(eqTop!=null&&eqBot!=null){
-      const y1=Math.min(eqTop,eqBot);
-      const y2=Math.max(eqTop,eqBot);
-      const grad=zoneCtx.createLinearGradient(0,y1,0,y2);
-      grad.addColorStop(0,'rgba(0,204,255,0.50)');
-      grad.addColorStop(0.5,'rgba(0,204,255,0.35)');
-      grad.addColorStop(1,'rgba(0,204,255,0.20)');
-      zoneCtx.fillStyle=grad;
-      zoneCtx.fillRect(0,y1,W,y2-y1);
-      zoneCtx.strokeStyle='rgba(0,204,255,1)';
-      zoneCtx.lineWidth=2;
-      zoneCtx.strokeRect(0,y1,W,y2-y1);
-      // Label
-      zoneCtx.fillStyle='rgba(0,204,255,1)';
-      zoneCtx.font='Bold 11px Share Tech Mono';
-      zoneCtx.textAlign='right';
-      zoneCtx.fillText('▓ EQ 50% ▓',W-8,y1+12);
-    }
-  }catch(e){console.error('drawZones error:',e);}
+  console.log('🎯 ZONES (price lines):',{rangeHigh,rangeLow,premiumUpper,premium,discount,discountLower,equilibrium});
+  
+  function setZoneLine(ref,price,color,label,lineStyle){
+    if(ref){try{cs.removePriceLine(ref);}catch(e){}}
+    if(price==null)return null;
+    return cs.createPriceLine({price,color:color,lineWidth:2,lineStyle:lineStyle||LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:label});
+  }
+  
+  // Premium zone (61.8%-78.6%) - RED
+  zoneLines.premiumUpper=setZoneLine(zoneLines.premiumUpper,premiumUpper,'rgba(255,51,85,0.9)','▓ PREMIUM 78.6%',LightweightCharts.LineStyle.Dotted);
+  zoneLines.premium=setZoneLine(zoneLines.premium,premium,'rgba(255,51,85,0.9)','▓ PREMIUM 61.8%',LightweightCharts.LineStyle.Dotted);
+  
+  // Discount zone (21.4%-38.2%) - GREEN
+  zoneLines.discount=setZoneLine(zoneLines.discount,discount,'rgba(0,255,136,0.9)','▓ DISCOUNT 38.2%',LightweightCharts.LineStyle.Dotted);
+  zoneLines.discountLower=setZoneLine(zoneLines.discountLower,discountLower,'rgba(0,255,136,0.9)','▓ DISCOUNT 21.4%',LightweightCharts.LineStyle.Dotted);
+  
+  // Equilibrium (50%) - CYAN
+  zoneLines.equilibrium=setZoneLine(zoneLines.equilibrium,equilibrium,'rgba(0,204,255,1)','▓ EQ 50%',LightweightCharts.LineStyle.Solid);
 }
 
-lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{drawVPC();drawZones();});
+function clearZoneLines(){
+  Object.values(zoneLines).forEach(ref=>{
+    if(ref){try{cs.removePriceLine(ref);}catch(e){}}
+  });
+  zoneLines={premiumUpper:null,premium:null,discount:null,discountLower:null,equilibrium:null};
+  lastZonePrices=null;
+}
+
+lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{drawVPC();updateZoneLines();});
 
 // ═══════════════════════════════════════════
 // SIGNAL MARKERS ON CHART
@@ -4281,7 +4219,7 @@ function drawFPChart(){
 // ═══════════════════════════════════════════
 let rPend=false,fpPend=false,hmPend=false;
 function schedRender(){
-  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();drawZones();updatePriceLines();});}
+  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();updateZoneLines();updatePriceLines();});}
   if(viewMode===1&&!fpPend){fpPend=true;requestAnimationFrame(()=>{fpPend=false;drawFPChart();});}
 }
 function renderAll(){renderPB();renderVP();renderHiLiq();updateThresh();evalSignal();}
@@ -4393,7 +4331,7 @@ setInterval(()=>{
   updateMomentumGauge();
 
   // Redraw all panels — 1s cadence is plenty for UI freshness
-  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();drawZones();updatePriceLines();});}
+  if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();updateZoneLines();updatePriceLines();});}
 },1000);
 
 // ═══════════════════════════════════════════════════════════════
