@@ -4237,6 +4237,29 @@ function renderAll(){renderPB();renderVP();renderHiLiq();updateThresh();evalSign
 // ═══════════════════════════════════════════
 let lastOrderFlowUpdate = 0;
 const ORDER_FLOW_INTERVAL = 5000; // Update every 5 seconds
+let ofWs = null;
+
+// Subscribe to depth data for order flow tracking (independent of heatmap view)
+function subscribeOrderFlowDepth() {
+  if (ofWs && ofWs.readyState === WebSocket.OPEN) return;
+  const sym = activeSym.toLowerCase();
+  ofWs = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${sym}@depth20@100ms`);
+  ofWs.onmessage = (e) => {
+    const d = JSON.parse(e.data).data || JSON.parse(e.data);
+    for (const [p, s] of (d.bids || [])) {
+      const sz = parseFloat(s);
+      if (sz === 0) delete orderBook.bids[p];
+      else orderBook.bids[p] = sz;
+    }
+    for (const [p, s] of (d.asks || [])) {
+      const sz = parseFloat(s);
+      if (sz === 0) delete orderBook.asks[p];
+      else orderBook.asks[p] = sz;
+    }
+  };
+  ofWs.onerror = () => {};
+  ofWs.onclose = () => { setTimeout(() => subscribeOrderFlowDepth(), 3000); };
+}
 
 async function trackOrderFlow() {
   const now = Date.now();
@@ -4248,6 +4271,9 @@ async function trackOrderFlow() {
     console.log('⚠️ Order flow: No price data yet');
     return;
   }
+  
+  // Ensure depth subscription is active
+  subscribeOrderFlowDepth();
   
   console.log('📡 Sending order flow data...');
   
