@@ -4229,7 +4229,96 @@ function schedRender(){
   if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();updateZoneLines();updatePriceLines();});}
   if(viewMode===1&&!fpPend){fpPend=true;requestAnimationFrame(()=>{fpPend=false;drawFPChart();});}
 }
-function renderAll(){renderPB();renderVP();renderHiLiq();updateThresh();evalSignal();}
+function renderAll(){renderPB();renderVP();renderHiLiq();updateThresh();evalSignal();trackOrderFlow();}
+
+// ═══════════════════════════════════════════
+// ORDER FLOW TRACKING (Phase 1)
+// Sends order book data to backend for spoof/iceberg detection
+// ═══════════════════════════════════════════
+let lastOrderFlowUpdate = 0;
+const ORDER_FLOW_INTERVAL = 5000; // Update every 5 seconds
+
+async function trackOrderFlow() {
+  const now = Date.now();
+  
+  // Throttle updates to avoid spamming the API
+  if (now - lastOrderFlowUpdate < ORDER_FLOW_INTERVAL) return;
+  lastOrderFlowUpdate = now;
+  
+  const s = ST[activeSym];
+  if (!s || !s.last) return;
+  
+  try {
+    // Collect recent trade prints (last 60 seconds)
+    const recentTrades = [];
+    const cutoffTime = now - 60000;
+    
+    // Get footprint bars and extract trade data
+    const fpKeys = Object.keys(s.fp).map(Number).sort((a,b) => b-a);
+    for (const ts of fpKeys.slice(0, 60)) { // Last 60 seconds
+      const bar = s.fp[ts];
+      if (!bar || !bar.levels) continue;
+      
+      // Extract trades from price levels
+      for (const [price, lvl] of Object.entries(bar.levels)) {
+        if (lvl.bid > 0) {
+          recentTrades.push({
+            price: parseFloat(price),
+            size: lvl.bid,
+            side: 'sell',
+            timestamp: ts
+          });
+        }
+        if (lvl.ask > 0) {
+          recentTrades.push({
+            price: parseFloat(price),
+            size: lvl.ask,
+            side: 'buy',
+            timestamp: ts
+          });
+        }
+      }
+    }
+    
+    // Send to order flow tracker
+    const response = await fetch('/api/orderflow-tracker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: activeSym,
+        orderBook: {
+          bids: [], // TODO: Add real DOM data when available
+          asks: []
+        },
+        tradePrints: recentTrades.slice(-100) // Last 100 trades
+      })
+    });
+    
+    if (!response.ok) {
+      console.warn('⚠️ Order flow tracking failed:', response.status);
+      return;
+    }
+    
+    const data = await response.json();
+    
+    // Display spoof/iceberg alerts if detected
+    if (data.spoofs && data.spoofs.length > 0) {
+      console.log('🚨 SPOOF DETECTED:', data.spoofs);
+      // TODO: Show visual alert on chart
+    }
+    
+    if (data.icebergs && data.icebergs.length > 0) {
+      console.log('🧊 ICEBERG DETECTED:', data.icebergs);
+      // TODO: Show visual alert on chart
+    }
+    
+  } catch (error) {
+    // Silently fail - don't break the terminal if tracking fails
+    if (error.message !== 'Failed to fetch') {
+      console.error('Order flow tracking error:', error);
+    }
+  }
+}
 
 // MOMENTUM GAUGE UPDATE
 // Updates the compact momentum gauge in real-time

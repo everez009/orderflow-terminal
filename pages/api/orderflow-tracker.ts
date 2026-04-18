@@ -30,6 +30,13 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!redis) {
+    return res.status(503).json({ 
+      error: 'Redis not configured',
+      message: 'UPSTASH_REDIS_URL environment variable is not set'
+    });
+  }
+
   try {
     const { symbol, orderBook, tradePrints } = req.body;
 
