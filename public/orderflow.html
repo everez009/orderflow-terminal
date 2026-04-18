@@ -4358,7 +4358,7 @@ const SIGNAL_COOLDOWN=120000; // 2 min minimum between same-direction signals
 // Institutional Enhancement: Signal persistence tracking
 // Requires conditions to hold for N consecutive checks before firing
 let signalPersistence = { buy: 0, sell: 0, lastCheck: 0 };
-const SIGNAL_PERSISTENCE_REQUIRED = 2; // Must pass 2 consecutive checks
+const SIGNAL_PERSISTENCE_REQUIRED = 3; // Must pass 3 consecutive checks (increased from 2)
 
 // Institutional Enhancement: Absorption detection
 let lastAbsorptionCheck = { bid: 0, ask: 0, price: 0 };
@@ -4544,6 +4544,30 @@ function evalSignal(){
     htfBullish = true;
     htfBearish = true;
   }
+  
+  // ── INSTITUTIONAL ENHANCEMENT: Multi-Timeframe Confluence ────
+  // Check if higher timeframe aligns with signal direction
+  let mtfConfluence = false;
+  if(activeTF >= 5) { // Only apply on 5m+ timeframes
+    const htfTF = activeTF * 4; // Next higher TF (e.g., 15m -> 1h)
+    const htfSym = ST[activeSym];
+    if(htfSym && htfSym.cb && htfSym.cb[htfTF]) {
+      const htfBars = Object.values(htfSym.cb[htfTF]).sort((a,b) => b.time - a.time).slice(0, 3);
+      if(htfBars.length >= 2) {
+        const currentTrend = htfBars[0].close > htfBars[0].open ? 'bull' : 'bear';
+        const prevTrend = htfBars[1].close > htfBars[1].open ? 'bull' : 'bear';
+        
+        // Require 2 consecutive candles in same direction for confluence
+        if(currentTrend === prevTrend) {
+          if(currentTrend === 'bull') {
+            mtfConfluence = 'bull';
+          } else {
+            mtfConfluence = 'bear';
+          }
+        }
+      }
+    }
+  }
 
   // ── SCORE & DECIDE ────────────────────────────────────────────
   const buyConditions=[
@@ -4647,12 +4671,48 @@ function evalSignal(){
     const sortedBars = Object.values(s.fp).sort((a,b) => b.ts - a.ts);
     const recentVol = sortedBars.slice(0, 3).reduce((sum, b) => sum + b.buy + b.sell, 0);
     const olderVol = sortedBars.slice(3, 6).reduce((sum, b) => sum + b.buy + b.sell, 0);
-    const volExpansion = recentVol > olderVol * 1.2; // 20% expansion
+    const volExpansion = recentVol > olderVol * 1.35; // 35% expansion (increased from 20%)
     
     if(volExpansion) {
       // Boost score when volume confirms signal
       if(buySignal) buyScore.score += 1;
       if(sellSignal) sellScore.score += 1;
+    } else {
+      // Penalize signals without volume confirmation
+      if(buySignal && buyScore.score < optionalRequired + 2) buySignal = false;
+      if(sellSignal && sellScore.score < optionalRequired + 2) sellSignal = false;
+    }
+  }
+  
+  // ── INSTITUTIONAL ENHANCEMENT: Price Structure Break ──────────
+  // Require recent break of structure for signal validity
+  let structureBreakConfirmed = true; // Default pass
+  if(s.fp && Object.keys(s.fp).length > 9) {
+    const sortedBars = Object.values(s.fp).sort((a,b) => b.ts - a.ts);
+    const last3 = sortedBars.slice(0, 3);
+    const prev3 = sortedBars.slice(3, 6);
+    
+    if(last3.length && prev3.length) {
+      const lastHigh = Math.max(...last3.map(b => b.high || price));
+      const lastLow = Math.min(...last3.map(b => b.low || price));
+      const prevHigh = Math.max(...prev3.map(b => b.high || price));
+      const prevLow = Math.min(...prev3.map(b => b.low || price));
+      
+      // For BUY: need higher high or higher low formation
+      if(buySignal) {
+        if(lastHigh <= prevHigh && lastLow >= prevLow) {
+          // No bullish structure break - require exceptional score
+          if(buyScore.score < optionalRequired + 2) buySignal = false;
+        }
+      }
+      
+      // For SELL: need lower low or lower high formation
+      if(sellSignal) {
+        if(lastLow >= prevLow && lastHigh <= prevHigh) {
+          // No bearish structure break - require exceptional score
+          if(sellScore.score < optionalRequired + 2) sellSignal = false;
+        }
+      }
     }
   }
   
@@ -4663,9 +4723,20 @@ function evalSignal(){
   const isLowLiquidity = lowLiquidityHours.includes(utcHour);
   
   if(isLowLiquidity) {
-    // Increase threshold during low liquidity
-    if(buyScore.score < optionalRequired + 2) buySignal = false;
-    if(sellScore.score < optionalRequired + 2) sellSignal = false;
+    // Increase threshold during low liquidity - require near-perfect setup
+    if(buyScore.score < optionalRequired + 3) buySignal = false;
+    if(sellScore.score < optionalRequired + 3) sellSignal = false;
+  }
+  
+  // ── INSTITUTIONAL ENHANCEMENT: MTF Confluence Filter ─────────
+  // Block signals that contradict higher timeframe trend
+  if(mtfConfluence === 'bear' && buySignal) {
+    // Only allow if score is exceptional (5/6 optional + all required)
+    if(buyScore.score < activeScore.total - 1) buySignal = false;
+  }
+  if(mtfConfluence === 'bull' && sellSignal) {
+    // Only allow if score is exceptional
+    if(sellScore.score < activeScore.total - 1) sellSignal = false;
   }
 
   // Stars (1-5): 2 optional = 1★, 3=2★★, 4=3★★★, 5=4★★★★, all=5★★★★★
