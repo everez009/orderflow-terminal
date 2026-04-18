@@ -4174,7 +4174,19 @@ function updateMomentumGauge() {
   // Update momentum value in price bar
   if (priceBarMomentum) {
     priceBarMomentum.textContent = (score > 0 ? '+' : '') + score.toFixed(0);
-    priceBarMomentum.style.color = score > 20 ? 'var(--green)' : score < -20 ? 'var(--red)' : 'var(--amber)';
+    if (score > 20) {
+      priceBarMomentum.style.color = 'var(--green)';
+      priceBarMomentum.style.background = 'rgba(0,255,136,.1)';
+      priceBarMomentum.style.border = '1px solid rgba(0,255,136,.3)';
+    } else if (score < -20) {
+      priceBarMomentum.style.color = 'var(--red)';
+      priceBarMomentum.style.background = 'rgba(255,51,85,.1)';
+      priceBarMomentum.style.border = '1px solid rgba(255,51,85,.3)';
+    } else {
+      priceBarMomentum.style.color = 'var(--amber)';
+      priceBarMomentum.style.background = 'rgba(255,170,0,.1)';
+      priceBarMomentum.style.border = '1px solid rgba(255,170,0,.3)';
+    }
   }
   
   // Update bar fill
