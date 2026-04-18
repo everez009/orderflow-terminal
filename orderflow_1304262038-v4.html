@@ -2019,6 +2019,8 @@ lwcEl.addEventListener('mouseup', () => {
 });
 
 let pocLine=null,vahLine=null,valLine=null;
+let premiumLine=null,discountLine=null,equilibriumLine=null;
+let premiumZoneLine=null,discountZoneLine=null;
 function setLine(ref,price,color,title){
   if(ref){try{cs.removePriceLine(ref);}catch(e){}}
   if(price==null)return null;
@@ -3833,6 +3835,52 @@ function updatePriceLines(){
   pocLine=setLine(pocLine,parseFloat(st.poc),'#ffaa00','◆POC');
   vahLine=setLine(vahLine,st.vah,'rgba(0,255,136,.7)','VAH');
   valLine=setLine(valLine,st.val,'rgba(255,51,85,.7)','VAL');
+  
+  // ── PREMIUM / DISCOUNT / EQUILIBRIUM ZONES ────────────
+  // Calculate from visible candle range
+  const s=ST[activeSym];
+  const tfData=s.cb[activeTF];
+  const barKeys=Object.keys(tfData).map(Number).sort((a,b)=>a-b);
+  
+  if(barKeys.length>=20){
+    // Use last 50 visible bars for range calculation
+    const recentBars=barKeys.slice(-50).map(k=>tfData[k]).filter(b=>b&&b.high&&b.low);
+    if(recentBars.length>=10){
+      const rangeHigh=Math.max(...recentBars.map(b=>b.high));
+      const rangeLow=Math.min(...recentBars.map(b=>b.low));
+      const range=rangeHigh-rangeLow;
+      
+      if(range>0){
+        // Equilibrium = 50% retracement
+        const equilibrium=rangeLow+range*0.5;
+        // Premium zone = 61.8% (sell zone, expensive)
+        const premium=rangeLow+range*0.618;
+        // Discount zone = 38.2% (buy zone, cheap)
+        const discount=rangeLow+range*0.382;
+        // Outer bounds for visual zones
+        const premiumUpper=rangeLow+range*0.786;
+        const discountLower=rangeLow+range*0.214;
+        
+        // Draw equilibrium line (50% - fair value)
+        equilibriumLine=setLine(equilibriumLine,equilibrium,'rgba(0,204,255,.5)','EQ 50%');
+        
+        // Draw premium zone boundary (61.8% - sell zone)
+        premiumLine=setLine(premiumLine,premium,'rgba(255,51,85,.6)','PREMIUM 61.8%');
+        premiumZoneLine=setLine(premiumZoneLine,premiumUpper,'rgba(255,51,85,.3)','PREMIUM TOP 78.6%');
+        
+        // Draw discount zone boundary (38.2% - buy zone)
+        discountLine=setLine(discountLine,discount,'rgba(0,255,136,.6)','DISCOUNT 38.2%');
+        discountZoneLine=setLine(discountZoneLine,discountLower,'rgba(0,255,136,.3)','DISCOUNT BOT 21.4%');
+      }
+    }
+  } else {
+    // Not enough data - remove zone lines
+    premiumLine=setLine(premiumLine,null,'','');
+    discountLine=setLine(discountLine,null,'','');
+    equilibriumLine=setLine(equilibriumLine,null,'','');
+    premiumZoneLine=setLine(premiumZoneLine,null,'','');
+    discountZoneLine=setLine(discountZoneLine,null,'','');
+  }
   
   // Remove old manual alert lines
   if (window.manualAlertLines) {
