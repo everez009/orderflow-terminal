@@ -2201,6 +2201,167 @@ function clearZoneLines(){
 lwChart.timeScale().subscribeVisibleLogicalRangeChange(()=>{drawVPC();updateZoneLines();});
 
 // ═══════════════════════════════════════════
+// DIVERGENCE DETECTION & VISUALIZATION
+// Detects regular and hidden divergences between price and indicators
+// ═══════════════════════════════════════════
+let divergenceMarkers = [];
+let lastDivergenceCheck = 0;
+const DIVERGENCE_CHECK_INTERVAL = 10000; // Check every 10 seconds
+
+function detectDivergences() {
+  const now = Date.now();
+  if (now - lastDivergenceCheck < DIVERGENCE_CHECK_INTERVAL) return;
+  lastDivergenceCheck = now;
+  
+  const s = ST[activeSym];
+  if (!s || !s.fp || Object.keys(s.fp).length < 20) return;
+  
+  const sortedBars = Object.values(s.fp).sort((a, b) => b.ts - a.ts);
+  if (sortedBars.length < 15) return;
+  
+  // Clear old divergence markers
+  divergenceMarkers.forEach(m => {
+    try { cs.removePriceLine(m); } catch(e) {}
+  });
+  divergenceMarkers = [];
+  
+  // Analyze last 15 bars for divergences
+  const lookback = 15;
+  const recentBars = sortedBars.slice(0, lookback);
+  
+  // Calculate cumulative delta for each bar
+  let cumDelta = 0;
+  const deltaSeries = recentBars.map(bar => {
+    const delta = bar.buy - bar.sell;
+    cumDelta += delta;
+    return { ts: bar.ts, price: bar.close || bar.open, delta, cumDelta, high: bar.high, low: bar.low };
+  }).reverse();
+  
+  if (deltaSeries.length < 10) return;
+  
+  // Find swing highs and lows in price
+  const swings = findSwingPoints(deltaSeries, 3);
+  if (swings.highs.length < 2 || swings.lows.length < 2) return;
+  
+  // Check for divergences at recent swing points
+  checkRegularBearishDivergence(swings, deltaSeries);
+  checkRegularBullishDivergence(swings, deltaSeries);
+  checkHiddenBearishDivergence(swings, deltaSeries);
+  checkHiddenBullishDivergence(swings, deltaSeries);
+}
+
+function findSwingPoints(data, strength) {
+  const highs = [];
+  const lows = [];
+  
+  for (let i = strength; i < data.length - strength; i++) {
+    const current = data[i];
+    const leftPrices = data.slice(i - strength, i).map(d => d.price);
+    const rightPrices = data.slice(i + 1, i + strength + 1).map(d => d.price);
+    
+    const isHigh = current.price > Math.max(...leftPrices) && current.price > Math.max(...rightPrices);
+    const isLow = current.price < Math.min(...leftPrices) && current.price < Math.min(...rightPrices);
+    
+    if (isHigh) highs.push({ index: i, ...current });
+    if (isLow) lows.push({ index: i, ...current });
+  }
+  
+  return { highs, lows };
+}
+
+function checkRegularBearishDivergence(swings, data) {
+  // Price makes higher high, delta makes lower high = bearish reversal
+  const lastTwoHighs = swings.highs.slice(-2);
+  if (lastTwoHighs.length < 2) return;
+  
+  const [h1, h2] = lastTwoHighs;
+  const priceHigher = h2.price > h1.price;
+  const deltaLower = h2.cumDelta < h1.cumDelta;
+  
+  if (priceHigher && deltaLower) {
+    console.log('🔴 REGULAR BEARISH DIVERGENCE detected');
+    drawDivergenceLine(h2, 'bearish', 'Regular Bearish');
+  }
+}
+
+function checkRegularBullishDivergence(swings, data) {
+  // Price makes lower low, delta makes higher low = bullish reversal
+  const lastTwoLows = swings.lows.slice(-2);
+  if (lastTwoLows.length < 2) return;
+  
+  const [l1, l2] = lastTwoLows;
+  const priceLower = l2.price < l1.price;
+  const deltaHigher = l2.cumDelta > l1.cumDelta;
+  
+  if (priceLower && deltaHigher) {
+    console.log('🟢 REGULAR BULLISH DIVERGENCE detected');
+    drawDivergenceLine(l2, 'bullish', 'Regular Bullish');
+  }
+}
+
+function checkHiddenBearishDivergence(swings, data) {
+  // Price makes lower high, delta makes higher high = continuation bearish
+  const lastTwoHighs = swings.highs.slice(-2);
+  if (lastTwoHighs.length < 2) return;
+  
+  const [h1, h2] = lastTwoHighs;
+  const priceLower = h2.price < h1.price;
+  const deltaHigher = h2.cumDelta > h1.cumDelta;
+  
+  if (priceLower && deltaHigher) {
+    console.log('🟠 HIDDEN BEARISH DIVERGENCE detected');
+    drawDivergenceLine(h2, 'hidden-bearish', 'Hidden Bearish');
+  }
+}
+
+function checkHiddenBullishDivergence(swings, data) {
+  // Price makes higher low, delta makes lower low = continuation bullish
+  const lastTwoLows = swings.lows.slice(-2);
+  if (lastTwoLows.length < 2) return;
+  
+  const [l1, l2] = lastTwoLows;
+  const priceHigher = l2.price > l1.price;
+  const deltaLower = l2.cumDelta < l1.cumDelta;
+  
+  if (priceHigher && deltaLower) {
+    console.log('🔵 HIDDEN BULLISH DIVERGENCE detected');
+    drawDivergenceLine(l2, 'hidden-bullish', 'Hidden Bullish');
+  }
+}
+
+function drawDivergenceLine(point, type, label) {
+  const colors = {
+    'bearish': 'rgba(255, 51, 85, 0.9)',
+    'bullish': 'rgba(0, 255, 136, 0.9)',
+    'hidden-bearish': 'rgba(255, 170, 0, 0.9)',
+    'hidden-bullish': 'rgba(0, 204, 255, 0.9)'
+  };
+  
+  const lineStyle = type.includes('hidden') ? LightweightCharts.LineStyle.Dotted : LightweightCharts.LineStyle.Dashed;
+  const color = colors[type] || 'rgba(255, 255, 255, 0.7)';
+  
+  try {
+    const line = cs.createPriceLine({
+      price: point.price,
+      color: color,
+      lineWidth: 2,
+      lineStyle: lineStyle,
+      axisLabelVisible: true,
+      title: `⚡ ${label}`
+    });
+    divergenceMarkers.push(line);
+    
+    // Auto-remove after 5 minutes
+    setTimeout(() => {
+      try { cs.removePriceLine(line); } catch(e) {}
+      divergenceMarkers = divergenceMarkers.filter(m => m !== line);
+    }, 300000);
+  } catch(e) {
+    console.error('Failed to draw divergence line:', e);
+  }
+}
+
+// ═══════════════════════════════════════════
 // SIGNAL MARKERS ON CHART
 // Add visual markers for 3+ star signals with Entry/SL/TP
 // ═══════════════════════════════════════════
@@ -4338,6 +4499,9 @@ setInterval(()=>{
   
   // Update momentum gauge
   updateMomentumGauge();
+  
+  // Detect divergences (every 10 seconds)
+  detectDivergences();
 
   // Redraw all panels — 1s cadence is plenty for UI freshness
   if(!rPend){rPend=true;requestAnimationFrame(()=>{rPend=false;renderAll();drawVPC();updateZoneLines();updatePriceLines();});}
