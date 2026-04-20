@@ -86,11 +86,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .leg{display:flex;gap:8px;align-items:center;font-size:.64em;}
 .bdg{font-size:.64em;padding:1px 4px;border-radius:2px;background:rgba(0,204,255,.1);color:var(--cdim);border:1px solid rgba(0,204,255,.2);}
 #lwc{position:absolute;top:22px;left:0;right:0;bottom:0;}
-#vpc-wrap{position:fixed;top:22px;right:0;width:80px;bottom:0;overflow-y:auto;overflow-x:hidden;z-index:10;scrollbar-width:thin;scrollbar-color:#0f2040 #030508;background:rgba(3,5,8,.65);}
-#vpc-wrap::-webkit-scrollbar{width:6px;}
-#vpc-wrap::-webkit-scrollbar-track{background:#030508;}
-#vpc-wrap::-webkit-scrollbar-thumb{background:#0f2040;border-radius:3px;}
-#vpc{display:block;}
+
 .loading-bar{position:absolute;top:22px;left:0;right:0;bottom:0;background:rgba(3,5,8,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:30;}
 .loading-bar .lt{font-family:var(--disp);font-size:.91em;color:var(--green);letter-spacing:3px;}
 .loading-bar .lp{width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;}
@@ -493,7 +489,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     </div>
   </div>
   <div id="lwc"></div>
-  <div id="vpc-wrap"><canvas id="vpc"></canvas></div>
   <canvas id="zoneOverlay" style="position:absolute;top:22px;left:0;right:0;bottom:0;pointer-events:none;z-index:100;background:rgba(255,0,0,0.05);"></canvas>
   <div class="loading-bar" id="loadingBar">
     <div class="lt" id="loadTxt">FETCHING KLINES...</div>
@@ -2012,10 +2007,33 @@ function setLine(ref,price,color,title){
   return cs.createPriceLine({price,color,lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title});
 }
 
+// ═══════════════════════════════════════════
+// VOLUME PROFILE ON CHART (Price Lines only)
+// POC, VAH, VAL shown as horizontal lines
+// ═══════════════════════════════════════════
+
+function drawVPC(){
+  // VP overlay removed - using only price lines
+}
+
+function updatePriceLines(){
+  const s=ST[activeSym];
+  if(!s||!s.vp)return;
+  const st=vpStats(s.vp);if(!st)return;
+  pocLine=setLine(pocLine,parseFloat(st.poc),'#ffaa00','◆POC');
+  vahLine=setLine(vahLine,st.vah,'rgba(0,255,136,.7)','VAH');
+  valLine=setLine(valLine,st.val,'rgba(255,51,85,.7)','VAL');
+  
+  // ── Remove old zone area series (legacy) ────────────
+  if(premiumZoneSeries){try{lwChart.removeSeries(premiumZoneSeries);}catch(e){}premiumZoneSeries=null;}
+  if(discountZoneSeries){try{lwChart.removeSeries(discountZoneSeries);}catch(e){}discountZoneSeries=null;}
+  if(equilibriumZoneSeries){try{lwChart.removeSeries(equilibriumZoneSeries);}catch(e){}equilibriumZoneSeries=null;}
+  lastZoneBars=null;
+}
+
 function resizeChart(){
   const el=document.getElementById('chartWrap');
   lwChart.applyOptions({width:el.clientWidth,height:el.clientHeight-22});
-  drawVPC();
   updateZoneLines();
 }
 window.addEventListener('resize',()=>{
@@ -2069,56 +2087,7 @@ if (window.innerWidth <= 768) {
   });
 }
 
-// VP canvas overlay
-const vpcEl=document.getElementById('vpc');
-const vpc=vpcEl.getContext('2d');
 
-function drawVPC(){
-  const el=document.getElementById('chartWrap');
-  const wrapH=el.clientHeight-22;
-  const H=Math.max(wrapH, 2000); // Make canvas tall enough for scrolling
-  vpcEl.width=80;vpcEl.height=H;
-  vpc.clearRect(0,0,80,H);
-  const s=ST[activeSym],cfg=SYMS[activeSym];
-  const st=vpStats(s.vp);if(!st)return;
-
-  vpc.fillStyle='rgba(3,5,8,.65)';vpc.fillRect(0,0,80,H);
-  vpc.strokeStyle='#0f2040';vpc.lineWidth=0.5;
-  vpc.beginPath();vpc.moveTo(0,0);vpc.lineTo(0,H);vpc.stroke();
-
-  const maxW=64;
-  
-  // Get price range for mapping
-  const prices = st.keys.map(k => parseFloat(k));
-  const maxPrice = Math.max(...prices);
-  const minPrice = Math.min(...prices);
-  const priceRange = maxPrice - minPrice || 1;
-  const padding = 50; // Top/bottom padding in pixels
-  const drawableHeight = H - (padding * 2);
-  
-  for(const k of st.keys){
-    const price=parseFloat(k);
-    // Map price to Y coordinate on tall canvas
-    const y = padding + drawableHeight * (1 - (price - minPrice) / priceRange);
-    if(y==null || y < 0 || y > H) continue;
-    const bkt=s.vp[k],tot=bkt.buy+bkt.sell;
-    if(!tot||!st.max)continue;
-    let bH=3; // Slightly taller bars for better visibility
-    try{const y2=padding + drawableHeight * (1 - (price + cfg.bucket - minPrice) / priceRange); if(y2!=null) bH=Math.max(3,Math.abs(y2-y)*.9);}catch(e){}
-    const tW=(tot/st.max)*maxW,bW=(bkt.buy/tot)*tW,sW=(bkt.sell/tot)*tW;
-    const isPoc=k===st.poc,isVA=st.vaK.has(k);
-    vpc.fillStyle=isPoc?'rgba(255,170,0,.45)':isVA?'rgba(0,255,136,.25)':'rgba(0,255,136,.14)';
-    vpc.fillRect(3,y-bH/2,bW,bH);
-    vpc.fillStyle=isPoc?'rgba(255,80,0,.45)':isVA?'rgba(255,51,85,.25)':'rgba(255,51,85,.14)';
-    vpc.fillRect(3+bW,y-bH/2,sW,bH);
-    if(isPoc){
-      vpc.strokeStyle='rgba(255,170,0,.55)';vpc.lineWidth=0.7;
-      vpc.strokeRect(3,y-bH/2,tW,bH);
-      vpc.fillStyle='#ffaa00';vpc.font='Bold 7px Share Tech Mono';vpc.textAlign='left';
-      vpc.fillText('◆',4,y-bH/2-1);
-    }
-  }
-}
 
 // Zone overlay canvas (replaced with price lines)
 // Kept for reference but no longer used
@@ -4006,12 +3975,6 @@ function heatColor(intensity){
 // ═══════════════════════════════════════════
 // PRICE LINES
 // ═══════════════════════════════════════════
-function updatePriceLines(){
-  const st=vpStats(ST[activeSym].vp);if(!st)return;
-  pocLine=setLine(pocLine,parseFloat(st.poc),'#ffaa00','◆POC');
-  vahLine=setLine(vahLine,st.vah,'rgba(0,255,136,.7)','VAH');
-  valLine=setLine(valLine,st.val,'rgba(255,51,85,.7)','VAL');
-  
   // ── Remove old zone area series (legacy) ────────────
   if(premiumZoneSeries){try{lwChart.removeSeries(premiumZoneSeries);}catch(e){}premiumZoneSeries=null;}
   if(discountZoneSeries){try{lwChart.removeSeries(discountZoneSeries);}catch(e){}discountZoneSeries=null;}
