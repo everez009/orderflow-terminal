@@ -86,7 +86,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .leg{display:flex;gap:8px;align-items:center;font-size:.64em;}
 .bdg{font-size:.64em;padding:1px 4px;border-radius:2px;background:rgba(0,204,255,.1);color:var(--cdim);border:1px solid rgba(0,204,255,.2);}
 #lwc{position:absolute;top:22px;left:0;right:0;bottom:0;}
-#vpc{position:absolute;top:22px;right:0;bottom:0;width:70px;pointer-events:none;z-index:10;}
+#vpc{position:absolute;top:22px;right:0;bottom:0;width:80px;overflow-y:auto;overflow-x:hidden;z-index:10;}
 .loading-bar{position:absolute;top:22px;left:0;right:0;bottom:0;background:rgba(3,5,8,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:30;}
 .loading-bar .lt{font-family:var(--disp);font-size:.91em;color:var(--green);letter-spacing:3px;}
 .loading-bar .lp{width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;}
@@ -424,7 +424,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     </div>
     <div class="sep"></div>
     <button class="ibtn on" id="sndBtn" onclick="toggleSound()">🔊 ON</button>
-    <button class="ibtn on" id="vpBtn" onclick="toggleVP()">VP ON</button>
     <button class="ibtn amb" id="hmBtn" onclick="cycleView()">FOOTPRINT</button>
     <button class="ibtn" onclick="cycleFontSize()">Aa</button>
     <button class="ibtn" id="htfBiasBtn" onclick="toggleHTFBias()" title="Higher Timeframe Bias Filter">📊 HTF OFF</button>
@@ -727,7 +726,7 @@ const TF_KLINE={1:'1m',5:'5m',15:'15m',60:'1h'};
 // Minimum 1:2 Risk:Reward ratio (adjustable per trade)
 let minRRRatio = 2.0; // Default minimum R:R of 1:2
 let activeSym='PAXGUSDT', activeTF=5;
-let vpOn=true;
+let vpOn=true; // Volume profile always on
 let viewMode=0; // 0=candlestick, 1=footprint, 2=heatmap
 let ws=null;
 
@@ -2073,13 +2072,12 @@ const vpc=vpcEl.getContext('2d');
 function drawVPC(){
   const el=document.getElementById('chartWrap');
   const H=el.clientHeight-22;
-  vpcEl.width=70;vpcEl.height=H;
-  vpc.clearRect(0,0,70,H);
-  if(!vpOn)return;
+  vpcEl.width=80;vpcEl.height=H;
+  vpc.clearRect(0,0,80,H);
   const s=ST[activeSym],cfg=SYMS[activeSym];
   const st=vpStats(s.vp);if(!st)return;
 
-  vpc.fillStyle='rgba(3,5,8,.65)';vpc.fillRect(0,0,70,H);
+  vpc.fillStyle='rgba(3,5,8,.65)';vpc.fillRect(0,0,80,H);
   vpc.strokeStyle='#0f2040';vpc.lineWidth=0.5;
   vpc.beginPath();vpc.moveTo(0,0);vpc.lineTo(0,H);vpc.stroke();
 
@@ -3342,15 +3340,6 @@ function fireNotifs(al){
   }
 }
 
-function toggleVP(){
-  vpOn=!vpOn;
-  const b=document.getElementById('vpBtn');
-  b.textContent='VP '+(vpOn?'ON':'OFF');
-  b.className='ibtn'+(vpOn?' on':'');
-  drawVPC();
-  if(!vpOn){pocLine=setLine(pocLine,null,'','');vahLine=setLine(vahLine,null,'','');valLine=setLine(valLine,null,'','');}
-  else updatePriceLines();
-}
 
 // 0=candlestick, 1=footprint, 2=heatmap
 function cycleView(){
@@ -4003,7 +3992,6 @@ function heatColor(intensity){
 // PRICE LINES
 // ═══════════════════════════════════════════
 function updatePriceLines(){
-  if(!vpOn){pocLine=setLine(pocLine,null,'','');vahLine=setLine(vahLine,null,'','');valLine=setLine(valLine,null,'','');return;}
   const st=vpStats(ST[activeSym].vp);if(!st)return;
   pocLine=setLine(pocLine,parseFloat(st.poc),'#ffaa00','◆POC');
   vahLine=setLine(vahLine,st.vah,'rgba(0,255,136,.7)','VAH');
