@@ -1042,11 +1042,11 @@ async function calculateHTFBias() {
     const sym = SYMS[activeSym].klSym;
     
     // Fetch 1H data (last 50 candles)
-    const h1Response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1h&limit=50`);
+    const h1Response = await fetch(`/api/klines?symbol=${sym}&interval=1h&limit=50`);
     const h1Data = await h1Response.json();
     
     // Fetch 4H data (last 30 candles)
-    const h4Response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=4h&limit=30`);
+    const h4Response = await fetch(`/api/klines?symbol=${sym}&interval=4h&limit=30`);
     const h4Data = await h4Response.json();
     
     // Calculate 1H bias
@@ -2516,7 +2516,8 @@ async function fetchHistory(sym,tf){
     setLoad(true,'LOADING...',50);
   } else {
     // Network fetch — 300 bars for optimal VP quality (75 hours @ 15m)
-    const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${interval}&limit=300`;
+    // Use proxy API to avoid CORS issues
+    const url=`/api/klines?symbol=${sym}&interval=${interval}&limit=300`;
     setLoad(true,'FETCHING KLINES...',10);
     try{
       // Add 10s timeout to prevent indefinite hangs
@@ -6315,7 +6316,7 @@ async function boot(){
   const syms=Object.keys(SYMS);
   try {
     await Promise.all(syms.map(sym=>{
-      const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${TF_KLINE[activeTF]}&limit=300`;
+      const url=`/api/klines?symbol=${sym}&interval=${TF_KLINE[activeTF]}&limit=300`;
       return fetch(url).then(r=>r.json()).then(data=>{
         klCache[sym+'_'+activeTF]={data,ts:Date.now()};
         console.log(`✅ Cached ${data.length} candles for ${sym}`);
@@ -6344,7 +6345,7 @@ async function boot(){
       for(const tf of otherTFs){
         const key=sym+'_'+tf;
         if(klCache[key]) continue;
-        const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${TF_KLINE[tf]}&limit=300`;
+        const url=`/api/klines?symbol=${sym}&interval=${TF_KLINE[tf]}&limit=300`;
         fetch(url).then(r=>r.json()).then(data=>{klCache[key]={data,ts:Date.now()};}).catch(()=>{});
       }
     }
