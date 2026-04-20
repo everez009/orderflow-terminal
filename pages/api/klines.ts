@@ -51,8 +51,13 @@ export default async function handler(
 
   // Fallback to Bybit API if Binance fails
   try {
+    // Bybit uses the same symbol format
     const bybitUrl = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${sym}&interval=${tf}&limit=${lim}`;
-    const response = await fetch(bybitUrl);
+    const response = await fetch(bybitUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+      },
+    });
     
     if (response.ok) {
       const bybitData = await response.json();
@@ -77,13 +82,56 @@ export default async function handler(
         res.status(200).json(klines);
         return;
       }
+    } else {
+      lastError += ` | Bybit HTTP ${response.status}`;
     }
   } catch (e: any) {
     lastError += ` | Bybit fallback failed: ${e.message}`;
   }
 
+  // Fallback 2: CryptoCompare API
+  try {
+    const base = sym.replace('USDT', '');
+    const ccUrl = `https://min-api.cryptocompare.com/data/v2/histominute?fsym=${base}&tsym=USDT&limit=${Math.min(lim, 2000)}&aggregate=${getAggregate(tf)}`;
+    const response = await fetch(ccUrl);
+    
+    if (response.ok) {
+      const ccData = await response.json();
+      if (ccData.Data?.Data) {
+        const klines = ccData.Data.Data.map((k: any) => [
+          k.time * 1000,
+          k.open.toFixed(2),
+          k.high.toFixed(2),
+          k.low.toFixed(2),
+          k.close.toFixed(2),
+          k.volumefrom.toString(),
+          (k.time + getIntervalMs(tf)) ,
+          k.volumeto.toString(),
+          '0',
+          '0',
+          '0',
+          '0',
+        ]);
+        
+        res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+        res.status(200).json(klines);
+        return;
+      }
+    }
+  } catch (e: any) {
+    lastError += ` | CryptoCompare failed: ${e.message}`;
+  }
+
   console.error('Klines proxy error:', lastError);
   res.status(500).json({ error: 'Failed to fetch klines from any source', details: lastError });
+}
+
+function getAggregate(interval: string): number {
+  const map: Record<string, number> = {
+    '1m': 1, '3m': 3, '5m': 5, '15m': 15,
+    '30m': 30, '1h': 60, '2h': 120, '4h': 240,
+  };
+  return map[interval] || 1;
 }
 
 function getIntervalMs(interval: string): number {
