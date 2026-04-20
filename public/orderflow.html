@@ -2519,15 +2519,20 @@ async function fetchHistory(sym,tf){
     const url=`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${interval}&limit=300`;
     setLoad(true,'FETCHING KLINES...',10);
     try{
-      const r=await fetch(url);
+      // Add 10s timeout to prevent indefinite hangs
+      const controller=new AbortController();
+      const timeoutId=setTimeout(()=>controller.abort(),10000);
+      const r=await fetch(url,{signal:controller.signal});
+      clearTimeout(timeoutId);
       if(!r.ok) throw new Error('HTTP '+r.status);
       data=await r.json();
       klCache[cacheKey]={data,ts:now};
+      console.log(`✅ Loaded ${data.length} klines for ${sym} ${interval}`);
     }catch(e){
       setLoad(false,'',0);
       document.getElementById('chartLbl').textContent='LOAD FAILED — LIVE ONLY';
-      console.error('❌ klines fetch failed:', e.message, e.stack);
-      alert('Failed to load candle data from Binance API. Check console for details.');
+      console.error('❌ klines fetch failed:', e.message);
+      // Don't alert - just continue with live data
       return;
     }
   }
