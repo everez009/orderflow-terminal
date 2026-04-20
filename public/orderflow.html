@@ -2017,12 +2017,10 @@ function drawVPC(){
 }
 
 function updatePriceLines(){
-  const s=ST[activeSym];
-  if(!s||!s.vp)return;
-  const st=vpStats(s.vp);if(!st)return;
-  pocLine=setLine(pocLine,parseFloat(st.poc),'#ffaa00','◆POC');
-  vahLine=setLine(vahLine,st.vah,'rgba(0,255,136,.7)','VAH');
-  valLine=setLine(valLine,st.val,'rgba(255,51,85,.7)','VAL');
+  // Remove POC/VAH/VAL lines - VP only shown in bottom-left panel
+  pocLine=setLine(pocLine,null,'','');
+  vahLine=setLine(vahLine,null,'','');
+  valLine=setLine(valLine,null,'','');
   
   // ── Remove old zone area series (legacy) ────────────
   if(premiumZoneSeries){try{lwChart.removeSeries(premiumZoneSeries);}catch(e){}premiumZoneSeries=null;}
