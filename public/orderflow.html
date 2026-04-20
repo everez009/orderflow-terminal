@@ -86,7 +86,8 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .leg{display:flex;gap:8px;align-items:center;font-size:.64em;}
 .bdg{font-size:.64em;padding:1px 4px;border-radius:2px;background:rgba(0,204,255,.1);color:var(--cdim);border:1px solid rgba(0,204,255,.2);}
 #lwc{position:absolute;top:22px;left:0;right:0;bottom:0;}
-#vpc{position:absolute;top:22px;right:0;bottom:0;width:80px;overflow-y:auto;overflow-x:hidden;z-index:10;}
+#vpc-wrap{position:absolute;top:22px;right:0;bottom:0;width:80px;overflow-y:auto;overflow-x:hidden;z-index:10;}
+#vpc{display:block;}
 .loading-bar{position:absolute;top:22px;left:0;right:0;bottom:0;background:rgba(3,5,8,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:30;}
 .loading-bar .lt{font-family:var(--disp);font-size:.91em;color:var(--green);letter-spacing:3px;}
 .loading-bar .lp{width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden;}
@@ -489,7 +490,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     </div>
   </div>
   <div id="lwc"></div>
-  <canvas id="vpc"></canvas>
+  <div id="vpc-wrap"><canvas id="vpc"></canvas></div>
   <canvas id="zoneOverlay" style="position:absolute;top:22px;left:0;right:0;bottom:0;pointer-events:none;z-index:100;background:rgba(255,0,0,0.05);"></canvas>
   <div class="loading-bar" id="loadingBar">
     <div class="lt" id="loadTxt">FETCHING KLINES...</div>
@@ -2071,7 +2072,8 @@ const vpc=vpcEl.getContext('2d');
 
 function drawVPC(){
   const el=document.getElementById('chartWrap');
-  const H=el.clientHeight-22;
+  const wrapH=el.clientHeight-22;
+  const H=Math.max(wrapH, 2000); // Make canvas tall enough for scrolling
   vpcEl.width=80;vpcEl.height=H;
   vpc.clearRect(0,0,80,H);
   const s=ST[activeSym],cfg=SYMS[activeSym];
@@ -2082,14 +2084,24 @@ function drawVPC(){
   vpc.beginPath();vpc.moveTo(0,0);vpc.lineTo(0,H);vpc.stroke();
 
   const maxW=64;
+  
+  // Get price range for mapping
+  const prices = st.keys.map(k => parseFloat(k));
+  const maxPrice = Math.max(...prices);
+  const minPrice = Math.min(...prices);
+  const priceRange = maxPrice - minPrice || 1;
+  const padding = 50; // Top/bottom padding in pixels
+  const drawableHeight = H - (padding * 2);
+  
   for(const k of st.keys){
     const price=parseFloat(k);
-    let y;try{y=cs.priceToCoordinate(price);}catch(e){continue;}
-    if(y==null)continue;
+    // Map price to Y coordinate on tall canvas
+    const y = padding + drawableHeight * (1 - (price - minPrice) / priceRange);
+    if(y==null || y < 0 || y > H) continue;
     const bkt=s.vp[k],tot=bkt.buy+bkt.sell;
     if(!tot||!st.max)continue;
-    let bH=2;
-    try{const y2=cs.priceToCoordinate(price+cfg.bucket);if(y2!=null)bH=Math.max(2,Math.abs(y2-y)*.9);}catch(e){}
+    let bH=3; // Slightly taller bars for better visibility
+    try{const y2=padding + drawableHeight * (1 - (price + cfg.bucket - minPrice) / priceRange); if(y2!=null) bH=Math.max(3,Math.abs(y2-y)*.9);}catch(e){}
     const tW=(tot/st.max)*maxW,bW=(bkt.buy/tot)*tW,sW=(bkt.sell/tot)*tW;
     const isPoc=k===st.poc,isVA=st.vaK.has(k);
     vpc.fillStyle=isPoc?'rgba(255,170,0,.45)':isVA?'rgba(0,255,136,.25)':'rgba(0,255,136,.14)';
