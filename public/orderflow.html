@@ -415,12 +415,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
     <button class="stab"    onclick="switchSym('BTCUSDT')"  id="tab-BTCUSDT">BTC/USDT</button>
   </div>
   <div class="cr">
-    <!-- Trading Mode Selector -->
-    <div class="mode-selector" style="display:flex;gap:3px;margin-right:8px">
-      <button class="mode-btn on" id="modeScalp" onclick="setTradingMode('scalp')" title="Scalping: Fast signals, lower threshold">⚡ SCALP</button>
-      <button class="mode-btn" id="modeDay" onclick="setTradingMode('day')" title="Day Trading: Balanced signals">📊 DAY</button>
-      <button class="mode-btn" id="modeSwing" onclick="setTradingMode('swing')" title="Swing Trading: High quality, fewer signals">🎯 SWING</button>
-    </div>
     <div class="sep"></div>
     <div class="tfg">
       <button class="tfb"    onclick="switchTF(1)"  id="tf-1">1M</button>
@@ -729,50 +723,9 @@ const SYMS={
 const TF_MS={1:60000,5:300000,15:900000,60:3600000};
 const TF_KLINE={1:'1m',5:'5m',15:'15m',60:'1h'};
 
-// Trading Mode Configuration
-// Different signal thresholds for different styles
-// ═══════════════════════════════════════════
-const TRADING_MODES = {
-  scalp: {
-    name: 'Scalping',
-    icon: '⚡',
-    description: 'Fast signals, lower threshold, more trades',
-    optionalRequired: 1,     // Need at least 1 optional condition (vs 2)
-    starThreshold: 0.2,      // Show 2+ stars at 20% optional pass rate
-    alertStars: 0.2,         // Alert on 20%+ (1★+)
-    color: '#ffa500',
-    // Optimal SL/TP settings for scalping
-    stopLossPct: 0.004,      // 0.4% SL
-    takeProfitPct: 0.008     // 0.8% TP (2:1 R:R)
-  },
-  day: {
-    name: 'Day Trading',
-    icon: '📊',
-    description: 'Balanced signals, moderate frequency',
-    optionalRequired: 2,     // Need at least 2 optional conditions
-    starThreshold: 0.4,      // Show 2+ stars at 40% optional pass rate
-    alertStars: 0.4,         // Alert on 40%+ (2★+)
-    color: '#00ff88',
-    // Optimal SL/TP settings for day trading
-    stopLossPct: 0.01,       // 1.0% SL
-    takeProfitPct: 0.02      // 2.0% TP (2:1 R:R)
-  },
-  swing: {
-    name: 'Swing Trading',
-    icon: '🎯',
-    description: 'High quality signals, fewer trades, higher confidence',
-    optionalRequired: 3,     // Need at least 3 optional conditions
-    starThreshold: 0.6,      // Show 2+ stars at 60% optional pass rate
-    alertStars: 0.6,         // Alert on 60%+ (3★+)
-    color: '#8a2be2',
-    // Optimal SL/TP settings for swing trading
-    stopLossPct: 0.025,      // 2.5% SL
-    takeProfitPct: 0.05      // 5.0% TP (2:1 R:R)
-  }
-};
-
-let activeMode = 'scalp'; // Default to M5 scalping mode
-
+// Universal Scanner Configuration
+// Minimum 1:2 Risk:Reward ratio (adjustable per trade)
+let minRRRatio = 2.0; // Default minimum R:R of 1:2
 let activeSym='PAXGUSDT', activeTF=5;
 let vpOn=true;
 let viewMode=0; // 0=candlestick, 1=footprint, 2=heatmap
@@ -1058,6 +1011,30 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 // ═══════════════════════════════════════════
+// Calculate ATR (Average True Range) for dynamic SL/TP
+function calculateATR(period = 14) {
+  const s = ST[activeSym];
+  if (!s || !s.cb || !s.cb[activeTF]) return 0;
+  
+  const bars = Object.values(s.cb[activeTF]).sort((a, b) => a.time - b.time).slice(-period - 1);
+  if (bars.length < period + 1) return 0;
+  
+  let trSum = 0;
+  for (let i = 1; i < bars.length; i++) {
+    const current = bars[i];
+    const previous = bars[i - 1];
+    
+    const highLow = current.high - current.low;
+    const highClose = Math.abs(current.high - previous.close);
+    const lowClose = Math.abs(current.low - previous.close);
+    
+    const tr = Math.max(highLow, highClose, lowClose);
+    trSum += tr;
+  }
+  
+  return trSum / period;
+}
+
 // HTF BIAS CALCULATION
 // Analyzes 1H, 4H trends for signal filtering
 // ═══════════════════════════════════════════
@@ -3389,51 +3366,6 @@ function cycleView(){
   else unsubscribeDepth();
 }
 
-// ═══════════════════════════════════════════
-// TRADING MODE FUNCTIONS
-// ═══════════════════════════════════════════
-function setTradingMode(mode){
-  if(!TRADING_MODES[mode]) return;
-  
-  activeMode = mode;
-  const config = TRADING_MODES[mode];
-  
-  // Update UI buttons
-  document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('on'));
-  document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('on');
-  
-  // Save to localStorage
-  try {
-    localStorage.setItem('orderflow_trading_mode', mode);
-  } catch(e) {
-    console.warn('Could not save trading mode:', e);
-  }
-  
-  console.log(`🎯 Trading mode changed to: ${config.icon} ${config.name.toUpperCase()} - ${config.description}`);
-  console.log(`   • Optional conditions required: ${config.optionalRequired}/5`);
-  console.log(`   • Alert threshold: ${(config.alertStars * 100).toFixed(0)}% (${Math.ceil(config.alertStars * 5)}★+)`);
-  
-  // Re-evaluate signals with new thresholds
-  renderAll();
-}
-
-function loadTradingMode(){
-  try {
-    const saved = localStorage.getItem('orderflow_trading_mode');
-    if(saved && TRADING_MODES[saved]){
-      activeMode = saved;
-      console.log(`✅ Loaded trading mode from storage: ${TRADING_MODES[saved].name}`);
-      
-      // Update UI
-      document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('on'));
-      const modeKey = 'mode' + saved.charAt(0).toUpperCase() + saved.slice(1);
-      const btn = document.getElementById(modeKey);
-      if(btn) btn.classList.add('on');
-    }
-  } catch(e) {
-    console.warn('Could not load trading mode:', e);
-  }
-}
 
 // ═══════════════════════════════════════════
 // BOOKMAP HEATMAP ENGINE
@@ -4703,27 +4635,26 @@ function evalSignal(){
   const buyScore=scoreSet(buyConditions);
   const sellScore=scoreSet(sellConditions);
 
-  // Get current mode configuration
-  const modeConfig = TRADING_MODES[activeMode];
-  const optionalRequired = modeConfig.optionalRequired;
+  // Universal threshold: minimum 3 optional conditions + R:R validation
+  const OPTIONAL_REQUIRED = 3;
 
-  // Debug logging - check why no signal
+  // Debug logging
   if(!buyScore.reqPass || !sellScore.reqPass) {
-    console.log(`🔍 Signal Check [${modeConfig.icon} ${modeConfig.name.toUpperCase()}]:`, {
+    console.log('🔍 Signal Check:', {
       atSupport,
       atResistance,
       fpBullish,
       fpBearish,
       buyRequiredPass: buyScore.reqPass,
       sellRequiredPass: sellScore.reqPass,
-      buyOptional: `${buyScore.score}/${optionalRequired} required`,
-      sellOptional: `${sellScore.score}/${optionalRequired} required`
+      buyOptional: `${buyScore.score}/${OPTIONAL_REQUIRED} required`,
+      sellOptional: `${sellScore.score}/${OPTIONAL_REQUIRED} required`
     });
   }
 
-  // Need both required conditions + mode-specific optional count
-  let buySignal=buyScore.reqPass&&buyScore.score>=optionalRequired;
-  let sellSignal=sellScore.reqPass&&sellScore.score>=optionalRequired;
+  // Need both required conditions + minimum 3 optional
+  let buySignal=buyScore.reqPass&&buyScore.score>=OPTIONAL_REQUIRED;
+  let sellSignal=sellScore.reqPass&&sellScore.score>=OPTIONAL_REQUIRED;
 
   // ── INSTITUTIONAL ENHANCEMENT: Signal Persistence ─────────────
   // Signals must hold for 2+ consecutive checks (filters false positives)
@@ -4782,8 +4713,8 @@ function evalSignal(){
       if(sellSignal) sellScore.score += 1;
     } else {
       // Penalize signals without volume confirmation
-      if(buySignal && buyScore.score < optionalRequired + 2) buySignal = false;
-      if(sellSignal && sellScore.score < optionalRequired + 2) sellSignal = false;
+      if(buySignal && buyScore.score < OPTIONAL_REQUIRED + 2) buySignal = false;
+      if(sellSignal && sellScore.score < OPTIONAL_REQUIRED + 2) sellSignal = false;
     }
   }
   
@@ -4805,7 +4736,7 @@ function evalSignal(){
       if(buySignal) {
         if(lastHigh <= prevHigh && lastLow >= prevLow) {
           // No bullish structure break - require exceptional score
-          if(buyScore.score < optionalRequired + 2) buySignal = false;
+          if(buyScore.score < OPTIONAL_REQUIRED + 2) buySignal = false;
         }
       }
       
@@ -4813,7 +4744,7 @@ function evalSignal(){
       if(sellSignal) {
         if(lastLow >= prevLow && lastHigh <= prevHigh) {
           // No bearish structure break - require exceptional score
-          if(sellScore.score < optionalRequired + 2) sellSignal = false;
+          if(sellScore.score < OPTIONAL_REQUIRED + 2) sellSignal = false;
         }
       }
     }
@@ -4827,8 +4758,8 @@ function evalSignal(){
   
   if(isLowLiquidity) {
     // Increase threshold during low liquidity - require near-perfect setup
-    if(buyScore.score < optionalRequired + 3) buySignal = false;
-    if(sellScore.score < optionalRequired + 3) sellSignal = false;
+    if(buyScore.score < OPTIONAL_REQUIRED + 3) buySignal = false;
+    if(sellScore.score < OPTIONAL_REQUIRED + 3) sellSignal = false;
   }
   
   // ── INSTITUTIONAL ENHANCEMENT: MTF Confluence Filter ─────────
@@ -4898,8 +4829,7 @@ function evalSignal(){
     const starStr=stars(activeScore.score,activeScore.total);
     dot.className='sig-dot '+direction;
     lbl.className='sig-label '+direction;
-    const modeIcon = TRADING_MODES[activeMode].icon;
-    lbl.textContent=`${modeIcon} ${(direction==='buy'?'▲ BUY SIGNAL':'▼ SELL SIGNAL')} ${starStr}`;
+    lbl.textContent=`${(direction==='buy'?'▲ BUY SIGNAL':'▼ SELL SIGNAL')} ${starStr}`;
     bar.style.borderBottomColor=direction==='buy'?'rgba(0,255,136,.5)':'rgba(255,51,85,.5)';
     bar.style.background=direction==='buy'?'rgba(0,20,10,.6)':'rgba(20,0,5,.6)';
 
@@ -4912,16 +4842,15 @@ function evalSignal(){
     const levelLabel=direction==='buy'
       ?`Near support $${nearSupport?.p.toFixed(cfg.dec)||'--'}`
       :`Near resistance $${nearResistance?.p.toFixed(cfg.dec)||'--'}`;
-    const modeName = TRADING_MODES[activeMode].name;
     const htfInfo = htfBiasEnabled ? ` · HTF: ${htfBiasData.daily > 0 ? '🟢' : htfBiasData.daily < 0 ? '🔴' : '⚪'}${htfBiasData.daily.toFixed(0)}` : '';
-    metaDiv.innerHTML=`<div>${levelLabel}</div><div style="color:var(--dim)">FP: B${fpBuyDelta.toFixed(2)} S${fpSellDelta.toFixed(2)} · VP: ${sessionBuyPct.toFixed(0)}% buy · Mode: ${modeName}${htfInfo}</div>`;
+    metaDiv.innerHTML=`<div>${levelLabel}</div><div style="color:var(--dim)">FP: B${fpBuyDelta.toFixed(2)} S${fpSellDelta.toFixed(2)} · VP: ${sessionBuyPct.toFixed(0)}% buy · Min R:R 1:${minRRRatio.toFixed(1)}${htfInfo}</div>`;
 
     // Fire notifications on NEW signal (direction change or cooldown expired)
     const isNew=(direction!==lastSignal)||(now-lastSignalTime>SIGNAL_COOLDOWN);
     if(isNew){
-      // Only alert on mode-specific star threshold
+      // Alert on 3+ stars minimum
       const starPct=activeScore.score/activeScore.total;
-      if(starPct>=modeConfig.alertStars){
+      if(starPct>=0.5){ // 50%+ optional conditions (3/6)
         lastSignal=direction; lastSignalTime=now;
         
         // Track signal for validation
@@ -4940,9 +4869,7 @@ function evalSignal(){
     // No signal
     dot.className='sig-dot none';
     lbl.className='sig-label none';
-    const modeIcon = TRADING_MODES[activeMode].icon;
-    const modeName = TRADING_MODES[activeMode].name;
-    lbl.textContent=`${modeIcon} SCANNING... (${modeName})`;
+    lbl.textContent=`SCANNING...`;
     bar.style.borderBottomColor='var(--border)';
     bar.style.background='var(--bg2)';
     // Show condition status quietly
@@ -4950,7 +4877,7 @@ function evalSignal(){
     condDiv.innerHTML=best.map(c=>
       `<span class="scon ${c.pass?(c.required?'warn':'warn'):'fail'}">${c.pass?'~':'✗'} ${c.label}</span>`
     ).join('');
-    metaDiv.innerHTML=`<div style="color:var(--dim)">BUY: ${buyScore.score}/${buyScore.total} opt · SELL: ${sellScore.score}/${sellScore.total} opt</div><div style="color:var(--dim)">Need 2+ optional + both required</div>`;
+    metaDiv.innerHTML=`<div style="color:var(--dim)">BUY: ${buyScore.score}/${buyScore.total} opt · SELL: ${sellScore.score}/${sellScore.total} opt</div><div style="color:var(--dim)">Need 3+ optional + both required · Min R:R 1:${minRRRatio.toFixed(1)}</div>`;
     if(lastSignal!==null){ lastSignal=null; }
   }
 }
@@ -5231,9 +5158,13 @@ function fireSignalNotif(dir,price,stars,levelLabel,score,cfg){
   
   // Add EP, TP, SL as horizontal price lines on chart
   if (starCount >= 3) {
-    const modeConfig = TRADING_MODES[activeMode];
-    const tp = dir === 'buy' ? price * (1 + modeConfig.takeProfitPct) : price * (1 - modeConfig.takeProfitPct);
-    const sl = dir === 'buy' ? price * (1 - modeConfig.stopLossPct) : price * (1 + modeConfig.stopLossPct);
+    // Calculate SL/TP based on minimum R:R ratio of 1:2
+    const atr = calculateATR(14); // 14-period ATR
+    const slDistance = atr * 1.5; // Stop loss at 1.5x ATR
+    const tpDistance = slDistance * minRRRatio; // Take profit at minimum R:R ratio
+    
+    const sl = dir === 'buy' ? price - slDistance : price + slDistance;
+    const tp = dir === 'buy' ? price + tpDistance : price - tpDistance;
     
     // Remove old signal lines if they exist
     if (window.signalLines) {
