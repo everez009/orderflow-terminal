@@ -422,8 +422,6 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
       <button class="mode-btn" id="modeSwing" onclick="setTradingMode('swing')" title="Swing Trading: High quality, fewer signals">🎯 SWING</button>
     </div>
     <div class="sep"></div>
-    <button class="ibtn" onclick="generateSignal()" id="signalBtn" style="color:var(--cyan);border-color:var(--cyan)">🤖 AI</button>
-    <div class="sep"></div>
     <div class="tfg">
       <button class="tfb"    onclick="switchTF(1)"  id="tf-1">1M</button>
       <button class="tfb"    onclick="switchTF(5)"  id="tf-5">5M</button>
@@ -4526,65 +4524,6 @@ const SIGNAL_PERSISTENCE_REQUIRED = 3; // Must pass 3 consecutive checks (increa
 
 // Institutional Enhancement: Absorption detection
 let lastAbsorptionCheck = { bid: 0, ask: 0, price: 0 };
-
-// AI SIGNAL GENERATION (Phase 2)
-async function generateSignal() {
-  const btn = document.getElementById('signalBtn');
-  if (!btn) return;
-  btn.textContent = '⏳ AI';
-  btn.disabled = true;
-  try {
-    const s = ST[activeSym];
-    if (!s || !s.last) { alert('No price data'); return; }
-    const vp = s.vp, vpKeys = Object.keys(vp);
-    if (!vpKeys.length) { alert('No VP data'); return; }
-    const poc = parseFloat(vpKeys.reduce((a, b) => vp[a].buy + vp[a].sell > vp[b].buy + vp[b].sell ? a : b));
-    const vah = parseFloat(vpKeys.filter(k => parseFloat(k) > poc).sort((a,b) => parseFloat(a) - parseFloat(b))[0]) || poc * 1.01;
-    const val = parseFloat(vpKeys.filter(k => parseFloat(k) < poc).sort((a,b) => parseFloat(b) - parseFloat(a))[0]) || poc * 0.99;
-    const fpKeys = Object.keys(s.fp).map(Number).sort((a,b) => b-a);
-    let totalDelta = 0;
-    for (const ts of fpKeys.slice(0, 12)) {
-      const bar = s.fp[ts];
-      if (!bar || !bar.levels) continue;
-      let barBid = 0, barAsk = 0;
-      for (const lvl of Object.values(bar.levels)) { barBid += lvl.bid || 0; barAsk += lvl.ask || 0; }
-      totalDelta += (barAsk - barBid);
-    }
-    const bidWalls = Object.entries(orderBook.bids || {}).map(([p, sz]) => ({ price: parseFloat(p), size: parseFloat(sz) })).filter(w => w.size > 0).slice(0, 5);
-    const askWalls = Object.entries(orderBook.asks || {}).map(([p, sz]) => ({ price: parseFloat(p), size: parseFloat(sz) })).filter(w => w.size > 0).slice(0, 5);
-    const marketData = { symbol: activeSym, currentPrice: s.last, volumeProfile: { poc, vah, val }, footprint: { delta: totalDelta }, orderBook: { bidWalls, askWalls } };
-    console.log('📤 Market data sent to AI:', marketData);
-    const response = await fetch('/api/generate-signal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol: activeSym, marketData }) });
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-    const signal = await response.json();
-    console.log('Full signal response:', signal);
-    
-    let alertMsg = `${signal.signal} | ${signal.conviction} CONVICTION\nScore: ${signal.score}/10\n\n`;
-    
-    if (signal.signal === 'FLAT') {
-      alertMsg += `No trade signal at this time.\n\n${signal.primary_reason || signal.institutional_narrative || 'Awaiting better setup.'}`;
-    } else {
-      alertMsg += `Entry: $${signal.entry_zone?.price?.toLocaleString() || 'N/A'}\n`;
-      alertMsg += `Stop: $${signal.stop_loss?.price?.toLocaleString() || 'N/A'}\n`;
-      alertMsg += `TP1: $${signal.targets?.tp1?.toLocaleString() || 'N/A'}\n`;
-      alertMsg += `TP2: $${signal.targets?.tp2?.toLocaleString() || 'N/A'}\n`;
-      alertMsg += `TP3: $${signal.targets?.tp3?.toLocaleString() || 'N/A'}\n`;
-      alertMsg += `R:R Ratio: ${signal.rr_ratio?.toFixed(2) || 'N/A'}\n\n`;
-      alertMsg += `Reason: ${signal.primary_reason || 'N/A'}\n\n`;
-      if (signal.institutional_narrative) {
-        alertMsg += `Analysis: ${signal.institutional_narrative}`;
-      }
-    }
-    
-    alert(alertMsg);
-  } catch (error) {
-    console.error('❌ Signal failed:', error);
-    alert(`Failed: ${error.message}`);
-  } finally {
-    btn.textContent = '🤖 AI';
-    btn.disabled = false;
-  }
-}
 
 function evalSignal(){
   const s=ST[activeSym], cfg=SYMS[activeSym];
